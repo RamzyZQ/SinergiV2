@@ -1,7 +1,18 @@
+import * as React from "react"
 import { redirect } from "next/navigation"
+import { connection } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
-export default async function HomePage() {
+export default function HomePage() {
+  return (
+    <React.Suspense fallback={null}>
+      <HomeRedirect />
+    </React.Suspense>
+  )
+}
+
+async function HomeRedirect() {
+  await connection()
   const supabase = await createClient()
 
   const {
@@ -25,4 +36,5 @@ export default async function HomePage() {
   }
 
   redirect("/dashboard")
+  return null
 }
