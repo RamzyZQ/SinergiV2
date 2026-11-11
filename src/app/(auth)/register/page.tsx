@@ -7,143 +7,182 @@ import { registerAction } from "./actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { AlertCircle, Loader2, UserPlus } from "lucide-react"
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, UserPlus } from "lucide-react"
 
 export default function RegisterPage() {
   const [state, formAction, isPending] = useActionState(registerAction, null)
+  const [showPassword, setShowPassword] = React.useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false)
 
   return (
-    <Card className="shadow-sm border-slate-200 dark:border-slate-800">
-      <CardHeader className="space-y-1 text-center">
-        <CardTitle className="text-xl font-bold">Daftar Akun Mahasiswa</CardTitle>
-        <CardDescription>
-          Buat akun untuk mengajukan pendaftaran beasiswa di kampus
-        </CardDescription>
-      </CardHeader>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="space-y-1">
+        <h1 className="text-2xl font-black tracking-tight text-foreground">Buat Akun Baru</h1>
+        <p className="text-sm text-muted-foreground">
+          Daftar sebagai mahasiswa untuk mengajukan beasiswa
+        </p>
+      </div>
 
-      <form action={formAction}>
-        <CardContent className="space-y-4">
-          {state?.error && (
-            <div
-              role="alert"
-              className="flex items-center gap-2 p-3 text-sm rounded-lg bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900"
-            >
-              <AlertCircle className="size-4 shrink-0" />
-              <span>{state.error}</span>
-            </div>
-          )}
+      {/* Info banner */}
+      <div className="flex items-start gap-2.5 p-3.5 text-xs rounded-xl bg-sky-50 text-sky-800 border border-sky-200">
+        <CheckCircle2 className="size-4 shrink-0 text-sky-600 mt-0.5" />
+        <span>Akun langsung aktif setelah pendaftaran — tidak perlu menunggu email verifikasi.</span>
+      </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="nama">Nama Lengkap</Label>
-            <Input
-              id="nama"
-              name="nama"
-              placeholder="Contoh: Ahmad Fauzi"
-              required
-              disabled={isPending}
-            />
-          </div>
+      {/* Error */}
+      {state?.error && (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 p-3.5 text-sm rounded-xl bg-rose-50 text-rose-700 border border-rose-200"
+        >
+          <AlertCircle className="size-4 shrink-0 mt-0.5" />
+          <span>{state.error}</span>
+        </div>
+      )}
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="ahmad@mahasiswa.ac.id"
-              required
-              autoComplete="email"
-              disabled={isPending}
-            />
-          </div>
+      {/* Form */}
+      <form action={formAction} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="nama" className="text-sm font-semibold">
+            Nama Lengkap
+          </Label>
+          <Input
+            id="nama"
+            name="nama"
+            placeholder="Contoh: Ahmad Fauzi"
+            required
+            disabled={isPending}
+            className="h-11 bg-background border-border/80 focus-visible:ring-primary/40"
+          />
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Kata Sandi</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="email" className="text-sm font-semibold">
+            Email
+          </Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            placeholder="ahmad@mahasiswa.ac.id"
+            required
+            autoComplete="email"
+            disabled={isPending}
+            className="h-11 bg-background border-border/80 focus-visible:ring-primary/40"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="password" className="text-sm font-semibold">
+            Kata Sandi
+          </Label>
+          <div className="relative">
             <Input
               id="password"
               name="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Minimal 8 karakter"
               required
               autoComplete="new-password"
               disabled={isPending}
+              className="h-11 pr-11 bg-background border-border/80 focus-visible:ring-primary/40"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+              aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Konfirmasi Kata Sandi</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirmPassword" className="text-sm font-semibold">
+            Konfirmasi Kata Sandi
+          </Label>
+          <div className="relative">
             <Input
               id="confirmPassword"
               name="confirmPassword"
-              type="password"
+              type={showConfirmPassword ? "text" : "password"}
               placeholder="Ulangi kata sandi"
               required
               autoComplete="new-password"
               disabled={isPending}
+              className="h-11 pr-11 bg-background border-border/80 focus-visible:ring-primary/40"
             />
-          </div>
-
-          <div className="flex items-start gap-2.5 pt-2">
-            <input
-              type="checkbox"
-              id="privacyConsent"
-              name="privacyConsent"
-              required
-              disabled={isPending}
-              className="mt-1 size-4 rounded border-input text-primary focus:ring-ring"
-            />
-            <label
-              htmlFor="privacyConsent"
-              className="text-xs text-muted-foreground leading-relaxed cursor-pointer select-none"
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+              aria-label={showConfirmPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+              tabIndex={-1}
             >
-              Saya menyetujui{" "}
-              <Link
-                href="/privacy"
-                target="_blank"
-                className="font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
-              >
-                Kebijakan Privasi & Pemrosesan Data
-              </Link>{" "}
-              termasuk penggunaan data akademik & ekonomi untuk seleksi beasiswa
-              metode ELECTRE.
-            </label>
+              {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
           </div>
-        </CardContent>
+        </div>
 
-        <CardFooter className="flex flex-col gap-3 pt-2">
-          <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? (
-              <>
-                <Loader2 className="size-4 animate-spin mr-2" />
-                Mendaftarkan...
-              </>
-            ) : (
-              <>
-                <UserPlus className="size-4 mr-2" />
-                Buat Akun Sekarang
-              </>
-            )}
-          </Button>
-
-          <p className="text-xs text-center text-muted-foreground mt-2">
-            Sudah memiliki akun?{" "}
+        {/* Privacy consent */}
+        <div className="flex items-start gap-2.5 pt-1">
+          <input
+            type="checkbox"
+            id="privacyConsent"
+            name="privacyConsent"
+            required
+            disabled={isPending}
+            className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary/40 accent-primary"
+          />
+          <Label
+            htmlFor="privacyConsent"
+            className="text-xs text-muted-foreground leading-relaxed cursor-pointer"
+          >
+            Saya menyetujui pemrosesan data pribadi akademik dan finansial untuk keperluan evaluasi
+            beasiswa sesuai{" "}
             <Link
-              href="/login"
-              className="font-semibold text-primary hover:underline focus-visible:outline-none"
+              href="/privacy"
+              target="_blank"
+              className="text-primary underline underline-offset-2 hover:text-primary/80"
             >
-              Masuk di sini
+              Kebijakan Privasi
             </Link>
-          </p>
-        </CardFooter>
+            .
+          </Label>
+        </div>
+
+        <Button
+          type="submit"
+          className="w-full h-11 font-semibold text-sm gap-2 bg-primary hover:bg-primary/90 transition-all"
+          disabled={isPending}
+        >
+          {isPending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Mendaftarkan...
+            </>
+          ) : (
+            <>
+              <UserPlus className="size-4" />
+              Daftar Sekarang
+            </>
+          )}
+        </Button>
       </form>
-    </Card>
+
+      <p className="text-sm text-center text-muted-foreground">
+        Sudah memiliki akun?{" "}
+        <Link
+          href="/login"
+          className="font-semibold text-primary hover:underline underline-offset-4 focus-visible:outline-none"
+        >
+          Masuk di sini
+        </Link>
+      </p>
+    </div>
   )
 }
+

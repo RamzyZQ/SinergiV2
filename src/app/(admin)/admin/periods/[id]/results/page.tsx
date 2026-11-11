@@ -15,42 +15,26 @@ export default async function AdminResultsPage({ params, searchParams }: Results
 
   const supabase = await createClient()
 
-  // 1. Verify admin
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const { data: roleData } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", user.id)
-    .single()
-
-  if (!roleData || roleData.role !== "admin") {
-    redirect("/dashboard")
-  }
-
-  // 2. Fetch period
-  const { data: period, error: periodErr } = await supabase
-    .from("scholarship_periods")
-    .select("id, nama, kuota, status, tgl_tutup")
-    .eq("id", periodId)
-    .single()
+  // Fetch period and calculation runs concurrently
+  const [
+    { data: period, error: periodErr },
+    { data: rawRuns },
+  ] = await Promise.all([
+    supabase
+      .from("scholarship_periods")
+      .select("id, nama, kuota, status, tgl_tutup")
+      .eq("id", periodId)
+      .single(),
+    supabase
+      .from("calculation_runs")
+      .select("id, tipe, created_at, dijalankan_oleh")
+      .eq("period_id", periodId)
+      .order("created_at", { ascending: false }),
+  ])
 
   if (periodErr || !period) {
     notFound()
   }
-
-  // 3. Fetch calculation runs for this period
-  const { data: rawRuns } = await supabase
-    .from("calculation_runs")
-    .select("id, tipe, created_at, dijalankan_oleh")
-    .eq("period_id", periodId)
-    .order("created_at", { ascending: false })
 
   const runs: CalculationRunMeta[] = (rawRuns || []).map((r) => ({
     id: r.id,

@@ -24,41 +24,42 @@ async function PeriodCalculateContent({ params }: CalculatePageProps) {
   await connection()
   const supabase = await createClient()
 
-  // 1. Fetch period
-  const { data: period, error: pErr } = await supabase
-    .from("scholarship_periods")
-    .select("id, nama, status, kuota")
-    .eq("id", id)
-    .single()
+  // Fetch period, verified count, criteria, and runs concurrently
+  const [
+    { data: period, error: pErr },
+    { count: verifiedCount },
+    { data: criteriaList },
+    { data: runs },
+  ] = await Promise.all([
+    supabase
+      .from("scholarship_periods")
+      .select("id, nama, status, kuota")
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("applications")
+      .select("*", { count: "exact", head: true })
+      .eq("period_id", id)
+      .eq("status", "verified"),
+    supabase
+      .from("criteria")
+      .select("id, bobot")
+      .eq("period_id", id),
+    supabase
+      .from("calculation_runs")
+      .select("*")
+      .eq("period_id", id)
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ])
 
   if (pErr || !period) notFound()
-
-  // 2. Count verified applicants
-  const { count: verifiedCount } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("period_id", id)
-    .eq("status", "verified")
-
-  // 3. Fetch criteria for weight check
-  const { data: criteriaList } = await supabase
-    .from("criteria")
-    .select("id, bobot")
-    .eq("period_id", id)
 
   const criteriaCount = criteriaList?.length || 0
   const totalWeight = (criteriaList || []).reduce(
     (acc, c) => acc + Number(c.bobot),
     0
   )
-
-  // 4. Fetch latest calculation run (official preferred)
-  const { data: runs } = await supabase
-    .from("calculation_runs")
-    .select("*")
-    .eq("period_id", id)
-    .order("created_at", { ascending: false })
-    .limit(5)
 
   const officialRun = runs?.find((r) => r.tipe === "official")
   const latestRun = officialRun || runs?.[0] || null

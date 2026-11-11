@@ -11,47 +11,31 @@ export default async function AdminAnalysisPage({ params }: AnalysisPageProps) {
   const { id: periodId } = await params
   const supabase = await createClient()
 
-  // 1. Verify admin
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const { data: roleData } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", user.id)
-    .single()
-
-  if (!roleData || roleData.role !== "admin") {
-    redirect("/dashboard")
-  }
-
-  // 2. Fetch period
-  const { data: period, error: periodErr } = await supabase
-    .from("scholarship_periods")
-    .select(
-      "id, nama, kuota, status, threshold_c_mode, threshold_c, threshold_d_mode, threshold_d, tie_break_rules"
-    )
-    .eq("id", periodId)
-    .single()
+  // Fetch period and official calculation run concurrently
+  const [
+    { data: period, error: periodErr },
+    { data: officialRun },
+  ] = await Promise.all([
+    supabase
+      .from("scholarship_periods")
+      .select(
+        "id, nama, kuota, status, threshold_c_mode, threshold_c, threshold_d_mode, threshold_d, tie_break_rules"
+      )
+      .eq("id", periodId)
+      .single(),
+    supabase
+      .from("calculation_runs")
+      .select("id, snapshot_kriteria, created_at")
+      .eq("period_id", periodId)
+      .eq("tipe", "official")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
 
   if (periodErr || !period) {
     notFound()
   }
-
-  // 3. Fetch latest official calculation run
-  const { data: officialRun } = await supabase
-    .from("calculation_runs")
-    .select("id, snapshot_kriteria, created_at")
-    .eq("period_id", periodId)
-    .eq("tipe", "official")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
 
   if (!officialRun) {
     return (

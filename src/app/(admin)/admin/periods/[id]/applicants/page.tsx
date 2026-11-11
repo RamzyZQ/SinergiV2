@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ApplicantsWorkspace, ApplicantItem } from "./applicants-workspace"
+import { BulkApplicantImport } from "./bulk-applicant-import"
 
 interface ApplicantsPageProps {
   params: Promise<{ id: string }>
@@ -23,74 +24,77 @@ async function PeriodApplicantsContent({ params }: ApplicantsPageProps) {
   await connection()
   const supabase = await createClient()
 
-  // 1. Fetch period
-  const { data: period, error: pErr } = await supabase
-    .from("scholarship_periods")
-    .select("id, status")
-    .eq("id", id)
-    .single()
+  // 1. Fetch period, applications, and criteria concurrently
+  const [
+    { data: period, error: pErr },
+    { data: applications },
+    { data: criteriaList },
+  ] = await Promise.all([
+    supabase
+      .from("scholarship_periods")
+      .select("id, status")
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("applications")
+      .select("id, user_id, period_id, status, submitted_at, catatan_admin, created_at")
+      .eq("period_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("criteria")
+      .select("id, nama, tipe")
+      .eq("period_id", id),
+  ])
 
   if (pErr || !period) notFound()
-
-  // 2. Fetch applications for this period
-  const { data: applications } = await supabase
-    .from("applications")
-    .select("id, user_id, period_id, status, submitted_at, catatan_admin, created_at")
-    .eq("period_id", id)
-    .order("created_at", { ascending: false })
 
   const userIds = (applications || []).map((a) => a.user_id)
   const applicationIds = (applications || []).map((a) => a.id)
 
-  // 3. Fetch profiles
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, nama, nim, prodi, semester")
-    .in(
-      "id",
-      userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]
-    )
+  // 2. Fetch profiles, application values, and documents concurrently
+  const [
+    { data: profiles },
+    { data: appValues },
+    { data: documents },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, nama, nim, prodi, semester")
+      .in(
+        "id",
+        userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]
+      ),
+    supabase
+      .from("application_values")
+      .select("application_id, criteria_id, nilai_mentah, skor")
+      .in(
+        "application_id",
+        applicationIds.length > 0
+          ? applicationIds
+          : ["00000000-0000-0000-0000-000000000000"]
+      ),
+    supabase
+      .from("documents")
+      .select("id, application_id, jenis, storage_path, status_verifikasi, catatan, created_at")
+      .in(
+        "application_id",
+        applicationIds.length > 0
+          ? applicationIds
+          : ["00000000-0000-0000-0000-000000000000"]
+      ),
+  ])
 
   const profileMap = new Map((profiles || []).map((p) => [p.id, p]))
-
-  // 4. Fetch criteria for period (to get criteria names & types)
-  const { data: criteriaList } = await supabase
-    .from("criteria")
-    .select("id, nama, tipe")
-    .eq("period_id", id)
-
   const criteriaMap = new Map((criteriaList || []).map((c) => [c.id, c]))
 
-  // 5. Fetch application_values
-  const { data: appValues } = await supabase
-    .from("application_values")
-    .select("application_id, criteria_id, nilai_mentah, skor")
-    .in(
-      "application_id",
-      applicationIds.length > 0
-        ? applicationIds
-        : ["00000000-0000-0000-0000-000000000000"]
-    )
-
-  const valuesByApp = new Map<string, typeof appValues>()
+  const valuesByApp = new Map<string, NonNullable<typeof appValues>>()
   for (const val of appValues || []) {
     const arr = valuesByApp.get(val.application_id) || []
     arr.push(val)
     valuesByApp.set(val.application_id, arr)
   }
 
-  // 6. Fetch documents
-  const { data: documents } = await supabase
-    .from("documents")
-    .select("id, application_id, jenis, storage_path, status_verifikasi, catatan, created_at")
-    .in(
-      "application_id",
-      applicationIds.length > 0
-        ? applicationIds
-        : ["00000000-0000-0000-0000-000000000000"]
-    )
-
-  const docsByApp = new Map<string, typeof documents>()
+  const docsByApp = new Map<string, NonNullable<typeof documents>>()
   for (const doc of documents || []) {
     const arr = docsByApp.get(doc.application_id) || []
     arr.push(doc)
@@ -143,11 +147,20 @@ async function PeriodApplicantsContent({ params }: ApplicantsPageProps) {
   })
 
   return (
-    <ApplicantsWorkspace
-      periodId={period.id}
-      periodStatus={period.status}
-      applicants={applicants}
-    />
+    <div className="space-y-4">
+      <BulkApplicantImport
+        periodId={period.id}
+        criteria={(criteriaList || []).map((criterion) => ({
+          id: criterion.id,
+          nama: criterion.nama,
+        }))}
+      />
+      <ApplicantsWorkspace
+        periodId={period.id}
+        periodStatus={period.status}
+        applicants={applicants}
+      />
+    </div>
   )
 }
 

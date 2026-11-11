@@ -44,6 +44,14 @@ Alur seleksi mengikuti mesin status terpadu dengan validasi prasyarat ketat di s
 5. **Calculated:** Eksekusi kalkulasi matriks ELECTRE I menghasilkan snapshot resmi (*official run*) dan pemeringkatan Net Dominance beserta penanganan nilai imbang (*tie-breaking*).
 6. **Published:** Hasil seleksi diumumkan ke mahasiswa, status pendaftaran disinkronkan, dan notifikasi email resmi dikirimkan.
 
+### Impor Data Uji Massal
+
+Admin dapat membuka **Pelamar & Verifikasi** pada suatu periode, mengunduh template CSV, lalu mengunggah berkas `.csv` atau `.xlsx`. Isi kolom `Alternatif`, `Nama Mahasiswa`, dan satu kolom untuk setiap kriteria sesuai nama yang tampil di template. Semua nilai harus cocok dengan tepat satu rentang skala kriteria; maksimal 500 baris dapat diimpor sekaligus.
+
+Impor membuat akun dan pendaftaran sintetis berstatus terverifikasi agar dapat langsung dipakai untuk simulasi/kalkulasi. Akun tersebut tidak memiliki kredensial login dan diberi NIM penanda `UJI`; data mahasiswa asli, bobot, dan kriteria tidak diubah. Periode yang sudah dipublikasikan tidak menerima impor data uji.
+
+Data pada lampiran percakapan tersedia sebagai [CSV siap impor](./tests/fixtures/mahasiswa-beasiswa-prestasi.csv). Jika nama kriteria di periode berbeda, unduh template dari aplikasi dan sesuaikan judul kolom CSV.
+
 ---
 
 ## 🧮 Mesin ELECTRE I & Metodologi

@@ -43,7 +43,7 @@ async function StudentLayoutContent({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       <StudentHeader userName={userName} userEmail={user?.email || ""} />
       <main className="flex-1 container mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-8">
         <React.Suspense fallback={<StudentPageFallback />}>
@@ -56,7 +56,7 @@ async function StudentLayoutContent({
 
 function StudentLayoutFallback() {
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950">
+    <div className="min-h-screen bg-background">
       <header className="h-16 border-b bg-background">
         <div className="container mx-auto flex h-full max-w-5xl items-center px-4 sm:px-6">
           <Skeleton className="h-8 w-40" />

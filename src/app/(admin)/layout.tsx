@@ -12,7 +12,7 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen flex bg-slate-50/50 dark:bg-slate-950">
+    <div className="min-h-screen flex bg-background">
       <React.Suspense fallback={<AdminSidebarFallback />}>
         <AdminSidebar />
       </React.Suspense>
@@ -52,17 +52,18 @@ async function AdminLayoutContent({
     redirect("/dashboard")
   }
 
-  // Fetch available periods for the header selector
-  const { data: periods } = await supabase
-    .from("scholarship_periods")
-    .select("id, nama, status")
-    .order("created_at", { ascending: false })
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("nama")
-    .eq("id", user.id)
-    .maybeSingle()
+  // Fetch available periods and admin profile concurrently in parallel
+  const [{ data: periods }, { data: profile }] = await Promise.all([
+    supabase
+      .from("scholarship_periods")
+      .select("id, nama, status")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("profiles")
+      .select("nama")
+      .eq("id", user.id)
+      .maybeSingle(),
+  ])
 
   const userName = profile?.nama || user.user_metadata?.nama || "Administrator"
 
@@ -84,7 +85,7 @@ async function AdminLayoutContent({
 
 function AdminSidebarFallback() {
   return (
-    <aside className="hidden lg:flex w-64 flex-col border-r bg-card h-screen sticky top-0 shrink-0 z-30">
+    <aside className="hidden lg:flex w-64 flex-col border-r bg-sidebar h-screen sticky top-0 shrink-0 z-30">
       <div className="h-16 flex items-center gap-2.5 px-6 border-b">
         <Skeleton className="size-8 rounded-lg" />
         <div className="space-y-1">

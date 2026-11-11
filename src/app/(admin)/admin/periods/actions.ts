@@ -1,9 +1,13 @@
 "use server"
 
+import { randomBytes } from "node:crypto"
+import { Readable } from "node:stream"
+import ExcelJS from "exceljs"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { resend, buildPublicationEmailHtml } from "@/lib/email/resend"
+import { parseApplicantImportRows } from "@/lib/import/applicant-import"
 import {
   calculateElectre,
   ElectreCriterion,
@@ -373,13 +377,17 @@ export async function createCriteriaAction(
     }
 
     const nama = (formData.get("nama") as string)?.trim()
-    const tipe = (formData.get("tipe") as "benefit" | "cost") || "benefit"
+    const tipe = formData.get("tipe")
     const bobot = parseFloat(formData.get("bobot") as string)
-    const sumber_nilai = (formData.get("sumber_nilai") as "input" | "document") || "input"
+    const sumber_nilai = formData.get("sumber_nilai")
 
     if (!nama) return { success: false, error: "Nama kriteria wajib diisi." }
-    if (isNaN(bobot) || bobot <= 0 || bobot > 100)
-      return { success: false, error: "Bobot harus bernilai antara 1 hingga 100." }
+    if (tipe !== "benefit" && tipe !== "cost")
+      return { success: false, error: "Tipe kriteria tidak valid." }
+    if (sumber_nilai !== "input" && sumber_nilai !== "document")
+      return { success: false, error: "Sumber nilai tidak valid." }
+    if (!Number.isFinite(bobot) || bobot <= 0 || bobot > 100)
+      return { success: false, error: "Bobot harus lebih besar dari 0 dan maksimal 100." }
 
     // Get current max order
     const { data: maxOrderRow } = await supabase
@@ -438,15 +446,19 @@ export async function updateCriteriaAction(
     }
 
     const nama = (formData.get("nama") as string)?.trim()
-    const tipe = (formData.get("tipe") as "benefit" | "cost") || "benefit"
+    const tipe = formData.get("tipe")
     const bobot = parseFloat(formData.get("bobot") as string)
-    const sumber_nilai = (formData.get("sumber_nilai") as "input" | "document") || "input"
+    const sumber_nilai = formData.get("sumber_nilai")
 
     if (!nama) return { success: false, error: "Nama kriteria wajib diisi." }
-    if (isNaN(bobot) || bobot <= 0 || bobot > 100)
-      return { success: false, error: "Bobot harus bernilai antara 1 hingga 100." }
+    if (tipe !== "benefit" && tipe !== "cost")
+      return { success: false, error: "Tipe kriteria tidak valid." }
+    if (sumber_nilai !== "input" && sumber_nilai !== "document")
+      return { success: false, error: "Sumber nilai tidak valid." }
+    if (!Number.isFinite(bobot) || bobot <= 0 || bobot > 100)
+      return { success: false, error: "Bobot harus lebih besar dari 0 dan maksimal 100." }
 
-    const { error: updErr } = await supabase
+    const { data: updatedCriterion, error: updErr } = await supabase
       .from("criteria")
       .update({
         nama,
@@ -456,8 +468,12 @@ export async function updateCriteriaAction(
         updated_at: new Date().toISOString(),
       })
       .eq("id", criteriaId)
+      .eq("period_id", periodId)
+      .select("id")
+      .maybeSingle()
 
     if (updErr) return { success: false, error: "Gagal memperbarui kriteria: " + updErr.message }
+    if (!updatedCriterion) return { success: false, error: "Kriteria tidak ditemukan pada periode ini." }
 
     revalidatePath(`/admin/periods/${periodId}/criteria`)
     return { success: true, message: "Kriteria berhasil diperbarui." }
@@ -491,6 +507,7 @@ export async function deleteCriteriaAction(
       .from("criteria")
       .delete()
       .eq("id", criteriaId)
+      .eq("period_id", periodId)
 
     if (delErr) return { success: false, error: "Gagal menghapus kriteria: " + delErr.message }
 
@@ -587,17 +604,26 @@ export async function createScaleAction(
       }
     }
 
+    const { data: criterion } = await supabase
+      .from("criteria")
+      .select("id")
+      .eq("id", criteriaId)
+      .eq("period_id", periodId)
+      .maybeSingle()
+
+    if (!criterion) return { success: false, error: "Kriteria tidak ditemukan pada periode ini." }
+
     const label = (formData.get("label") as string)?.trim()
     const nilai_min = parseFloat(formData.get("nilai_min") as string)
     const nilai_max = parseFloat(formData.get("nilai_max") as string)
     const skor = parseFloat(formData.get("skor") as string)
 
     if (!label) return { success: false, error: "Label skala wajib diisi." }
-    if (isNaN(nilai_min) || isNaN(nilai_max))
+    if (!Number.isFinite(nilai_min) || !Number.isFinite(nilai_max))
       return { success: false, error: "Nilai minimum dan maksimum harus berupa angka." }
     if (nilai_max < nilai_min)
       return { success: false, error: "Nilai maksimum harus lebih besar atau sama dengan nilai minimum." }
-    if (isNaN(skor) || skor <= 0)
+    if (!Number.isFinite(skor) || skor <= 0)
       return { success: false, error: "Skor harus berupa angka positif." }
 
     const { data: newScale, error: insErr } = await supabase
@@ -624,6 +650,69 @@ export async function createScaleAction(
   }
 }
 
+export async function updateScaleAction(
+  scaleId: string,
+  criteriaId: string,
+  periodId: string,
+  formData: FormData
+): Promise<ActionResponse> {
+  try {
+    const { supabase } = await verifyAdmin()
+
+    const { data: period } = await supabase
+      .from("scholarship_periods")
+      .select("status")
+      .eq("id", periodId)
+      .single()
+
+    if (!period || period.status !== "draft") {
+      return {
+        success: false,
+        error: "Skala kriteria terkunci karena periode sudah dibuka.",
+      }
+    }
+
+    const { data: criterion } = await supabase
+      .from("criteria")
+      .select("id")
+      .eq("id", criteriaId)
+      .eq("period_id", periodId)
+      .maybeSingle()
+
+    if (!criterion) return { success: false, error: "Kriteria tidak ditemukan pada periode ini." }
+
+    const label = (formData.get("label") as string)?.trim()
+    const nilai_min = parseFloat(formData.get("nilai_min") as string)
+    const nilai_max = parseFloat(formData.get("nilai_max") as string)
+    const skor = parseFloat(formData.get("skor") as string)
+
+    if (!label) return { success: false, error: "Label skala wajib diisi." }
+    if (!Number.isFinite(nilai_min) || !Number.isFinite(nilai_max))
+      return { success: false, error: "Nilai minimum dan maksimum harus berupa angka." }
+    if (nilai_max < nilai_min)
+      return { success: false, error: "Nilai maksimum harus lebih besar atau sama dengan nilai minimum." }
+    if (!Number.isFinite(skor) || skor <= 0)
+      return { success: false, error: "Skor harus berupa angka positif." }
+
+    const { data: updatedScale, error: updErr } = await supabase
+      .from("criteria_scales")
+      .update({ label, nilai_min, nilai_max, skor })
+      .eq("id", scaleId)
+      .eq("criteria_id", criteriaId)
+      .select("id")
+      .maybeSingle()
+
+    if (updErr) return { success: false, error: "Gagal memperbarui skala: " + updErr.message }
+    if (!updatedScale) return { success: false, error: "Skala tidak ditemukan pada kriteria ini." }
+
+    revalidatePath(`/admin/periods/${periodId}/criteria`)
+    return { success: true, message: "Skala berhasil diperbarui." }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Terjadi kesalahan"
+    return { success: false, error: message }
+  }
+}
+
 export async function deleteScaleAction(
   scaleId: string,
   periodId: string
@@ -644,6 +733,21 @@ export async function deleteScaleAction(
       }
     }
 
+    const { data: scale } = await supabase
+      .from("criteria_scales")
+      .select("criteria_id")
+      .eq("id", scaleId)
+      .maybeSingle()
+    if (!scale) return { success: false, error: "Skala tidak ditemukan." }
+
+    const { data: criterion } = await supabase
+      .from("criteria")
+      .select("id")
+      .eq("id", scale.criteria_id)
+      .eq("period_id", periodId)
+      .maybeSingle()
+    if (!criterion) return { success: false, error: "Skala tidak ditemukan pada periode ini." }
+
     const { error: delErr } = await supabase
       .from("criteria_scales")
       .delete()
@@ -653,6 +757,192 @@ export async function deleteScaleAction(
 
     revalidatePath(`/admin/periods/${periodId}/criteria`)
     return { success: true, message: "Skala berhasil dihapus." }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Terjadi kesalahan"
+    return { success: false, error: message }
+  }
+}
+
+export interface SaveAllDraftsPayload {
+  criteria: Record<
+    string,
+    {
+      nama: string
+      tipe: "benefit" | "cost"
+      bobot: string | number
+      sumber_nilai: "input" | "document"
+    }
+  >
+  scales: Record<
+    string,
+    {
+      label: string
+      nilai_min: string | number
+      nilai_max: string | number
+      skor: string | number
+    }
+  >
+}
+
+export async function saveAllCriteriaDraftsAction(
+  periodId: string,
+  drafts: SaveAllDraftsPayload
+): Promise<ActionResponse<{ savedCriteriaCount: number; savedScalesCount: number }>> {
+  try {
+    const { supabase } = await verifyAdmin()
+
+    const { data: period } = await supabase
+      .from("scholarship_periods")
+      .select("status")
+      .eq("id", periodId)
+      .single()
+
+    if (!period || period.status !== "draft") {
+      return {
+        success: false,
+        error: "Kriteria terkunci karena periode sudah dibuka atau tidak dalam status draft.",
+      }
+    }
+
+    let savedCriteriaCount = 0
+    let savedScalesCount = 0
+    const criterionIdMap: Record<string, string> = {}
+
+    // Process criteria drafts
+    for (const [id, cDraft] of Object.entries(drafts.criteria || {})) {
+      const nama = cDraft.nama?.trim()
+      const tipe = cDraft.tipe
+      const bobot = typeof cDraft.bobot === "number" ? cDraft.bobot : parseFloat(cDraft.bobot)
+      const sumber_nilai = cDraft.sumber_nilai
+
+      if (!nama) continue
+      if (tipe !== "benefit" && tipe !== "cost") continue
+      if (sumber_nilai !== "input" && sumber_nilai !== "document") continue
+      if (!Number.isFinite(bobot) || bobot <= 0 || bobot > 100) continue
+
+      if (id === "new") {
+        const { data: maxOrderRow } = await supabase
+          .from("criteria")
+          .select("urutan")
+          .eq("period_id", periodId)
+          .order("urutan", { ascending: false })
+          .limit(1)
+
+        const nextOrder = (maxOrderRow?.[0]?.urutan ?? 0) + 1
+
+        const { data: newCrit, error: insErr } = await supabase
+          .from("criteria")
+          .insert({
+            period_id: periodId,
+            nama,
+            tipe,
+            bobot,
+            urutan: nextOrder,
+            sumber_nilai,
+          })
+          .select("id")
+          .single()
+
+        if (!insErr && newCrit) {
+          savedCriteriaCount++
+          criterionIdMap[id] = newCrit.id
+        }
+      } else {
+        const { data: updCrit, error: updErr } = await supabase
+          .from("criteria")
+          .update({
+            nama,
+            tipe,
+            bobot,
+            sumber_nilai,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+          .eq("period_id", periodId)
+          .select("id")
+          .maybeSingle()
+
+        if (!updErr && updCrit) {
+          savedCriteriaCount++
+        }
+      }
+    }
+
+    // Process scales drafts
+    for (const [id, sDraft] of Object.entries(drafts.scales || {})) {
+      const label = sDraft.label?.trim()
+      const nilai_min =
+        typeof sDraft.nilai_min === "number" ? sDraft.nilai_min : parseFloat(sDraft.nilai_min)
+      const nilai_max =
+        typeof sDraft.nilai_max === "number" ? sDraft.nilai_max : parseFloat(sDraft.nilai_max)
+      const skor = typeof sDraft.skor === "number" ? sDraft.skor : parseFloat(sDraft.skor)
+
+      if (!label) continue
+      if (!Number.isFinite(nilai_min) || !Number.isFinite(nilai_max) || nilai_max < nilai_min) continue
+      if (!Number.isFinite(skor) || skor <= 0) continue
+
+      if (id.includes(":new")) {
+        const parts = id.split(":")
+        const rawCriterionId = parts[0]
+        const resolvedCriterionId = criterionIdMap[rawCriterionId] || rawCriterionId
+
+        const { data: crit } = await supabase
+          .from("criteria")
+          .select("id")
+          .eq("id", resolvedCriterionId)
+          .eq("period_id", periodId)
+          .maybeSingle()
+
+        if (!crit) continue
+
+        const { error: insErr } = await supabase.from("criteria_scales").insert({
+          criteria_id: resolvedCriterionId,
+          label,
+          nilai_min,
+          nilai_max,
+          skor,
+        })
+
+        if (!insErr) savedScalesCount++
+      } else {
+        const { data: scale } = await supabase
+          .from("criteria_scales")
+          .select("criteria_id")
+          .eq("id", id)
+          .maybeSingle()
+
+        if (!scale) continue
+
+        const { data: crit } = await supabase
+          .from("criteria")
+          .select("id")
+          .eq("id", scale.criteria_id)
+          .eq("period_id", periodId)
+          .maybeSingle()
+
+        if (!crit) continue
+
+        const { error: updErr } = await supabase
+          .from("criteria_scales")
+          .update({
+            label,
+            nilai_min,
+            nilai_max,
+            skor,
+          })
+          .eq("id", id)
+          .eq("criteria_id", scale.criteria_id)
+
+        if (!updErr) savedScalesCount++
+      }
+    }
+
+    revalidatePath(`/admin/periods/${periodId}/criteria`)
+    return {
+      success: true,
+      message: `Semua perubahan berhasil disimpan ke database (${savedCriteriaCount} kriteria, ${savedScalesCount} skala).`,
+      data: { savedCriteriaCount, savedScalesCount },
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Terjadi kesalahan"
     return { success: false, error: message }
@@ -785,6 +1075,297 @@ export async function getAdminDocumentSignedUrl(
   }
 }
 
+export async function importTestApplicantsAction(
+  periodId: string,
+  formData: FormData
+): Promise<ActionResponse<{ importedCount: number }>> {
+  const createdUserIds: string[] = []
+
+  try {
+    const { supabase } = await verifyAdmin()
+    const file = formData.get("file")
+
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, error: "Pilih berkas CSV atau Excel yang tidak kosong." }
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return { success: false, error: "Ukuran berkas maksimal 5 MB." }
+    }
+    const extension = file.name.split(".").pop()?.toLowerCase()
+    if (extension !== "csv" && extension !== "xlsx") {
+      return { success: false, error: "Format berkas harus CSV atau Excel (.xlsx)." }
+    }
+
+    const [
+      { data: period },
+      { data: criteria, error: criteriaError },
+    ] = await Promise.all([
+      supabase
+        .from("scholarship_periods")
+        .select("id, status")
+        .eq("id", periodId)
+        .maybeSingle(),
+      supabase
+        .from("criteria")
+        .select("id, nama")
+        .eq("period_id", periodId)
+        .order("urutan", { ascending: true }),
+    ])
+
+    if (!period) return { success: false, error: "Periode tidak ditemukan." }
+    if (period.status === "published") {
+      return { success: false, error: "Data tidak dapat diimpor ke periode yang sudah dipublikasikan." }
+    }
+    if (criteriaError) {
+      return { success: false, error: "Gagal memuat kriteria: " + criteriaError.message }
+    }
+    if (!criteria?.length) {
+      return { success: false, error: "Periode ini belum memiliki kriteria penilaian." }
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return {
+        success: false,
+        error: "Impor data uji memerlukan konfigurasi server Supabase Service Role.",
+      }
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const workbook = new ExcelJS.Workbook()
+    if (extension === "csv") {
+      await workbook.csv.read(Readable.from([buffer]))
+    } else {
+      await workbook.xlsx.read(Readable.from([buffer]))
+    }
+
+    const worksheet = workbook.worksheets[0]
+    if (!worksheet) {
+      return { success: false, error: "Berkas tidak memiliki lembar kerja." }
+    }
+
+    const rows: unknown[][] = []
+    let unsupportedCell: string | null = null
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      const values = Array.from({ length: worksheet.columnCount }, (_, index) => {
+        const value = row.getCell(index + 1).value
+        if (value === null || value === undefined) return ""
+        if (typeof value === "string" || typeof value === "number") return value
+        unsupportedCell = `Baris ${rowNumber}: rumus atau format sel kompleks tidak didukung.`
+        return ""
+      })
+      rows.push(values)
+    })
+    if (unsupportedCell) {
+      return { success: false, error: unsupportedCell }
+    }
+
+    const applicants = parseApplicantImportRows(
+      rows,
+      criteria.map((criterion) => criterion.nama)
+    )
+    const criterionIds = criteria.map((criterion) => criterion.id)
+    const { data: scales, error: scalesError } = await supabase
+      .from("criteria_scales")
+      .select("criteria_id, nilai_min, nilai_max, skor")
+      .in("criteria_id", criterionIds)
+
+    if (scalesError) {
+      return { success: false, error: "Gagal memuat skala kriteria: " + scalesError.message }
+    }
+
+    const valuesByApplicant = applicants.map((applicant, index) => {
+      return criteria.map((criterion) => {
+        const rawValue = applicant.values[criterion.nama]
+        const matchingScales = (scales || []).filter(
+          (scale) =>
+            scale.criteria_id === criterion.id &&
+            rawValue >= Number(scale.nilai_min) &&
+            rawValue <= Number(scale.nilai_max)
+        )
+
+        if (matchingScales.length !== 1) {
+          throw new Error(
+            matchingScales.length === 0
+              ? `Baris ${index + 2}: nilai ${rawValue} untuk kriteria "${criterion.nama}" tidak masuk ke skala mana pun.`
+              : `Baris ${index + 2}: skala untuk kriteria "${criterion.nama}" memiliki rentang yang tumpang tindih pada nilai ${rawValue}.`
+          )
+        }
+
+        return {
+          criteria_id: criterion.id,
+          nilai_mentah: rawValue,
+          skor: Number(matchingScales[0].skor),
+        }
+      })
+    })
+
+    const adminClient = createAdminClient()
+    const resolvedApplicants: Array<{
+      userId: string
+      nim: string
+      name: string
+      alternative: string
+    }> = []
+
+    for (const applicant of applicants) {
+      const alternativeSlug = applicant.alternative
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 24)
+      if (!alternativeSlug) {
+        throw new Error(`Kode alternatif "${applicant.alternative}" tidak dapat digunakan.`)
+      }
+
+      const nim = `UJI-${periodId.slice(0, 8).toUpperCase()}-${alternativeSlug}`
+      const { data: existingProfile, error: profileLookupError } = await adminClient
+        .from("profiles")
+        .select("id")
+        .eq("nim", nim)
+        .maybeSingle()
+      if (profileLookupError) throw profileLookupError
+
+      let userId: string
+      if (existingProfile) {
+        const { data: existingUser, error: userLookupError } =
+          await adminClient.auth.admin.getUserById(existingProfile.id)
+        if (userLookupError || !existingUser.user) {
+          throw new Error(`Akun data uji untuk alternatif ${applicant.alternative} tidak dapat diperiksa.`)
+        }
+        const metadata = existingUser.user.user_metadata
+        if (
+          metadata?.is_synthetic_test_data !== true ||
+          metadata?.import_period_id !== periodId ||
+          metadata?.import_alternative !== applicant.alternative
+        ) {
+          throw new Error(
+            `NIM data uji untuk alternatif ${applicant.alternative} sudah digunakan akun lain.`
+          )
+        }
+        userId = existingProfile.id
+      } else {
+        const email = `${periodId.replace(/-/g, "")}.${alternativeSlug.toLowerCase()}@example.test`
+        const { data: createdUser, error: createUserError } =
+          await adminClient.auth.admin.createUser({
+            email,
+            password: randomBytes(32).toString("base64url") + "Aa1!",
+            email_confirm: true,
+            user_metadata: {
+              nama: applicant.name,
+              is_synthetic_test_data: true,
+              import_period_id: periodId,
+              import_alternative: applicant.alternative,
+            },
+          })
+        if (createUserError || !createdUser.user) {
+          throw new Error(
+            `Gagal membuat data uji untuk alternatif ${applicant.alternative}: ${createUserError?.message || "Akun tidak dibuat."}`
+          )
+        }
+        userId = createdUser.user.id
+        createdUserIds.push(userId)
+      }
+
+      resolvedApplicants.push({
+        userId,
+        nim,
+        name: applicant.name,
+        alternative: applicant.alternative,
+      })
+    }
+
+    for (const applicant of resolvedApplicants) {
+      const { error } = await adminClient
+        .from("profiles")
+        .update({
+          nama: applicant.name,
+          nim: applicant.nim,
+          prodi: "Data Uji",
+          semester: null,
+        })
+        .eq("id", applicant.userId)
+      if (error) throw error
+    }
+
+    const submittedAt = new Date().toISOString()
+    const { data: applications, error: applicationsError } = await adminClient
+      .from("applications")
+      .upsert(
+        resolvedApplicants.map((applicant) => ({
+          user_id: applicant.userId,
+          period_id: periodId,
+          status: "verified" as const,
+          submitted_at: submittedAt,
+          catatan_admin: `Data uji impor massal (${applicant.alternative})`,
+        })),
+        { onConflict: "user_id,period_id" }
+      )
+      .select("id, user_id")
+    if (applicationsError || !applications) {
+      throw new Error("Gagal menyimpan pendaftaran data uji: " + (applicationsError?.message || "data tidak tersedia."))
+    }
+
+    const applicationIdByUser = new Map(
+      applications.map((application) => [application.user_id, application.id])
+    )
+    const valuesToSave = resolvedApplicants.flatMap((applicant, applicantIndex) => {
+      const applicationId = applicationIdByUser.get(applicant.userId)
+      if (!applicationId) return []
+      return valuesByApplicant[applicantIndex].map((value) => ({
+        application_id: applicationId,
+        criteria_id: value.criteria_id,
+        nilai_mentah: value.nilai_mentah,
+        skor: value.skor,
+      }))
+    })
+
+    if (valuesToSave.length !== applicants.length * criteria.length) {
+      throw new Error("Pendaftaran tersimpan, tetapi sebagian data nilai tidak dapat dipasangkan.")
+    }
+    const { error: valuesError } = await adminClient
+      .from("application_values")
+      .upsert(valuesToSave, { onConflict: "application_id,criteria_id" })
+    if (valuesError) throw new Error("Gagal menyimpan nilai kriteria: " + valuesError.message)
+
+    revalidatePath(`/admin/periods/${periodId}/applicants`)
+    revalidatePath(`/admin/periods/${periodId}/calculate`)
+    revalidatePath(`/admin/periods/${periodId}/results`)
+
+    return {
+      success: true,
+      message: `${applicants.length} data uji berhasil diimpor dan siap dihitung.`,
+      data: { importedCount: applicants.length },
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Terjadi kesalahan saat mengimpor data."
+    const cleanupErrors: string[] = []
+
+    if (createdUserIds.length > 0 && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const adminClient = createAdminClient()
+        for (const userId of createdUserIds) {
+          const { error } = await adminClient.auth.admin.deleteUser(userId)
+          if (error) cleanupErrors.push(error.message)
+        }
+      } catch (cleanupError: unknown) {
+        cleanupErrors.push(
+          cleanupError instanceof Error
+            ? cleanupError.message
+            : "Tidak dapat menghubungi Supabase untuk membersihkan akun data uji."
+        )
+      }
+    }
+
+    return {
+      success: false,
+      error: cleanupErrors.length
+        ? `${message} Pembersihan akun data uji juga gagal: ${cleanupErrors.join("; ")}`
+        : message,
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 7. Run ELECTRE Calculation (Official / Simulation)
 // ---------------------------------------------------------------------------
@@ -884,7 +1465,11 @@ export async function runElectreCalculationAction(
         scores[val.criteria_id] = Number(val.skor ?? 0)
 
         const critNameLower = (crit?.nama || "").toLowerCase()
-        if (critNameLower.includes("ipk") || critNameLower.includes("indeks prestasi")) {
+        if (
+          critNameLower === "ip" ||
+          critNameLower.includes("ipk") ||
+          critNameLower.includes("indeks prestasi")
+        ) {
           ipkVal = val.nilai_mentah !== null ? Number(val.nilai_mentah) : undefined
         }
         if (critNameLower.includes("penghasilan") || critNameLower.includes("gaji")) {
@@ -1163,15 +1748,19 @@ export async function sendPublicationNotificationsAction(
 
       if (resend) {
         try {
-          await resend.emails.send({
+          const sendResult = await resend.emails.send({
             from: "Seleksi Beasiswa <beasiswa@resend.dev>",
             to: recipientEmail,
             subject,
             html,
             text,
           })
+          if (sendResult?.error) {
+            console.warn("Resend delivery rejected/rate-limited for", recipientEmail, sendResult.error.message)
+            sendStatus = "failed"
+          }
         } catch (mailErr) {
-          console.error("Resend delivery failed for", recipientEmail, mailErr)
+          console.warn("Resend delivery exception for", recipientEmail, mailErr)
           sendStatus = "failed"
         }
       }
@@ -1219,4 +1808,3 @@ export async function sendPublicationNotificationsAction(
     return { success: false, error: message }
   }
 }
-

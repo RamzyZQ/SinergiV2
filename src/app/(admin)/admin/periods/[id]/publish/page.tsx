@@ -11,70 +11,50 @@ export default async function AdminPublishPage({ params }: PublishPageProps) {
   const { id: periodId } = await params
   const supabase = await createClient()
 
-  // 1. Verify admin
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const { data: roleData } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", user.id)
-    .single()
-
-  if (!roleData || roleData.role !== "admin") {
-    redirect("/dashboard")
-  }
-
-  // 2. Fetch period
-  const { data: period, error: periodErr } = await supabase
-    .from("scholarship_periods")
-    .select("id, nama, kuota, status")
-    .eq("id", periodId)
-    .single()
+  // Preconditions check: fetch period, criteria, application counts, and latest run concurrently
+  const [
+    { data: period, error: periodErr },
+    { data: criteria },
+    { count: unverifiedCount },
+    { count: verifiedCount },
+    { data: latestRun },
+  ] = await Promise.all([
+    supabase
+      .from("scholarship_periods")
+      .select("id, nama, kuota, status")
+      .eq("id", periodId)
+      .single(),
+    supabase
+      .from("criteria")
+      .select("id, bobot")
+      .eq("period_id", periodId),
+    supabase
+      .from("applications")
+      .select("*", { count: "exact", head: true })
+      .eq("period_id", periodId)
+      .eq("status", "submitted"),
+    supabase
+      .from("applications")
+      .select("*", { count: "exact", head: true })
+      .eq("period_id", periodId)
+      .in("status", ["verified", "passed", "not_passed"]),
+    supabase
+      .from("calculation_runs")
+      .select("id, created_at, snapshot_kriteria, snapshot_threshold")
+      .eq("period_id", periodId)
+      .eq("tipe", "official")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
 
   if (periodErr || !period) {
     notFound()
   }
 
-  // 3. Preconditions check
-  // Criteria validation
-  const { data: criteria } = await supabase
-    .from("criteria")
-    .select("id, bobot")
-    .eq("period_id", periodId)
-
   const totalWeight = (criteria || []).reduce((acc, c) => acc + Number(c.bobot), 0)
   const criteriaValid = Math.abs(totalWeight - 100) < 0.01 && (criteria || []).length > 0
-
-  // Applicants check
-  const { count: unverifiedCount } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("period_id", periodId)
-    .eq("status", "submitted")
-
-  const { count: verifiedCount } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("period_id", periodId)
-    .in("status", ["verified", "passed", "not_passed"])
-
   const allVerified = (unverifiedCount ?? 0) === 0 && (verifiedCount ?? 0) > 0
-
-  // Official run check
-  const { data: latestRun } = await supabase
-    .from("calculation_runs")
-    .select("id, snapshot_threshold, hasil_matriks")
-    .eq("period_id", periodId)
-    .eq("tipe", "official")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
 
   const officialRunExists = !!latestRun
 

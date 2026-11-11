@@ -23,28 +23,32 @@ async function PeriodOverviewContent({ params }: OverviewPageProps) {
   await connection()
   const supabase = await createClient()
 
-  // 1. Fetch period
-  const { data: period, error } = await supabase
-    .from("scholarship_periods")
-    .select("*")
-    .eq("id", id)
-    .single()
+  // Fetch period, criteria, application statuses, and official run in parallel
+  const [
+    { data: period, error },
+    { data: criteriaList },
+    { data: applications },
+    { count: officialRunCount },
+  ] = await Promise.all([
+    supabase.from("scholarship_periods").select("*").eq("id", id).single(),
+    supabase.from("criteria").select("id, bobot").eq("period_id", id),
+    supabase.from("applications").select("status").eq("period_id", id),
+    supabase
+      .from("calculation_runs")
+      .select("*", { count: "exact", head: true })
+      .eq("period_id", id)
+      .eq("tipe", "official"),
+  ])
 
   if (error || !period) notFound()
 
-  // 2. Fetch criteria count & total weight
-  const { data: criteriaList } = await supabase
-    .from("criteria")
-    .select("id, bobot")
-    .eq("period_id", id)
-
+  // Criteria metrics & scales completeness
   const criteriaCount = criteriaList?.length || 0
   const totalWeight = (criteriaList || []).reduce(
     (acc, c) => acc + Number(c.bobot),
     0
   )
 
-  // 3. Check scales completeness
   const criteriaIds = (criteriaList || []).map((c) => c.id)
   const { data: scales } = await supabase
     .from("criteria_scales")
@@ -61,37 +65,18 @@ async function PeriodOverviewContent({ params }: OverviewPageProps) {
     (c) => !criteriaWithScales.has(c.id)
   ).length
 
-  // 4. Applications count by status
-  const { count: submittedApplicants } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("period_id", id)
-    .eq("status", "submitted")
+  // Aggregate application status counts in memory (eliminates 4 separate count queries)
+  let submittedApplicants = 0
+  let verifiedApplicants = 0
+  let rejectedApplicants = 0
+  let draftApplicants = 0
 
-  const { count: verifiedApplicants } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("period_id", id)
-    .eq("status", "verified")
-
-  const { count: rejectedApplicants } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("period_id", id)
-    .eq("status", "rejected")
-
-  const { count: draftApplicants } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("period_id", id)
-    .eq("status", "draft")
-
-  // 5. Official calculation run check
-  const { count: officialRunCount } = await supabase
-    .from("calculation_runs")
-    .select("*", { count: "exact", head: true })
-    .eq("period_id", id)
-    .eq("tipe", "official")
+  for (const app of applications || []) {
+    if (app.status === "submitted") submittedApplicants++
+    else if (app.status === "verified") verifiedApplicants++
+    else if (app.status === "rejected") rejectedApplicants++
+    else if (app.status === "draft") draftApplicants++
+  }
 
   const tieBreakRules: string[] = Array.isArray(period.tie_break_rules)
     ? (period.tie_break_rules as string[])

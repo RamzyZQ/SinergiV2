@@ -38,64 +38,64 @@ async function AdminDashboardContent() {
   await connection()
   const supabase = await createClient()
 
-  // 1. Aggregate application statistics
-  const { count: totalApplicants } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
+  // ✅ PERFORMANCE: Run all independent queries in parallel using Promise.all
+  const [
+    { count: totalApplicants },
+    { data: statusCounts },
+    { data: periods },
+    { data: latestRun },
+  ] = await Promise.all([
+    // Total applicants count
+    supabase.from("applications").select("*", { count: "exact", head: true }),
 
-  const { count: draftCount } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "draft")
+    // All status counts in one query — group by status
+    supabase.from("applications").select("status"),
 
-  const { count: pendingVerification } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "submitted")
+    // All periods
+    supabase
+      .from("scholarship_periods")
+      .select("*")
+      .order("created_at", { ascending: false }),
 
-  const { count: totalVerified } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "verified")
+    // Latest calculation run
+    supabase
+      .from("calculation_runs")
+      .select("snapshot_threshold, hasil_matriks")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
 
-  const { count: rejectedCount } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "rejected")
+  // Derive counts from the fetched status rows (avoids 6 separate queries)
+  const counts = (statusCounts || []).reduce(
+    (acc, row) => {
+      const s = row.status as string
+      acc[s] = (acc[s] || 0) + 1
+      return acc
+    },
+    {} as Record<string, number>
+  )
 
-  const { count: passedCount } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "passed")
+  const draftCount = counts["draft"] ?? 0
+  const pendingVerification = counts["submitted"] ?? 0
+  const totalVerified = counts["verified"] ?? 0
+  const rejectedCount = counts["rejected"] ?? 0
+  const passedCount = counts["passed"] ?? 0
+  const notPassedCount = counts["not_passed"] ?? 0
 
-  const { count: notPassedCount } = await supabase
-    .from("applications")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "not_passed")
+  // Find most active period
+  const activePeriod =
+    periods?.find((p) =>
+      ["open", "verification", "calculated", "published"].includes(p.status)
+    ) ||
+    periods?.[0] ||
+    null
 
-  // 2. Query periods
-  const { data: periods } = await supabase
-    .from("scholarship_periods")
-    .select("*")
-    .order("created_at", { ascending: false })
-
-  // Find most active period (prefer open/verification/calculated)
-  const activePeriod = periods?.find((p) =>
-    ["open", "verification", "calculated", "published"].includes(p.status)
-  ) || periods?.[0] || null
-
-  // Calculate total quota across active or all periods
+  // Calculate total quota across all periods
   const totalQuota = (periods || []).reduce((acc, p) => acc + (p.kuota || 0), 0)
 
-  // 3. Query latest calculation run for cutoff net score
+  // Extract cutoff score from latest run
   let cutoffScore: number | null = null
-  const { data: latestRun } = await supabase
-    .from("calculation_runs")
-    .select("snapshot_threshold, hasil_matriks")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
   if (latestRun?.hasil_matriks && typeof latestRun.hasil_matriks === "object") {
     const hasil = latestRun.hasil_matriks as Record<string, unknown>
     if (typeof hasil.cutoff_net_score === "number") {
@@ -103,7 +103,7 @@ async function AdminDashboardContent() {
     }
   }
 
-  // 4. Build Action Items ("Perlu Ditindak")
+  // Build Action Items
   interface ActionItem {
     id: string
     title: string
@@ -116,8 +116,7 @@ async function AdminDashboardContent() {
 
   const actionItems: ActionItem[] = []
 
-  // Check periods with pending applicant verifications
-  if ((pendingVerification ?? 0) > 0 && activePeriod) {
+  if (pendingVerification > 0 && activePeriod) {
     actionItems.push({
       id: "verify-applicants",
       title: `${pendingVerification} Pelamar Belum Diverifikasi`,
@@ -129,13 +128,13 @@ async function AdminDashboardContent() {
     })
   }
 
-  // Check periods ready for calculation
   const verificationPeriods = (periods || []).filter((p) => p.status === "verification")
   for (const vp of verificationPeriods) {
     actionItems.push({
       id: `calc-${vp.id}`,
       title: `Kalkulasi ELECTRE Siap Dijalankan: ${vp.nama}`,
-      description: "Tahap verifikasi telah aktif. Pastikan semua pelamar terverifikasi dan jalankan kalkulasi matriks ELECTRE.",
+      description:
+        "Tahap verifikasi telah aktif. Pastikan semua pelamar terverifikasi dan jalankan kalkulasi matriks ELECTRE.",
       href: `/admin/periods/${vp.id}/calculate`,
       badge: "Kalkulasi",
       badgeVariant: "warning",
@@ -143,13 +142,13 @@ async function AdminDashboardContent() {
     })
   }
 
-  // Check periods ready for publication
   const calculatedPeriods = (periods || []).filter((p) => p.status === "calculated")
   for (const cp of calculatedPeriods) {
     actionItems.push({
       id: `pub-${cp.id}`,
       title: `Publikasi Hasil Siap: ${cp.nama}`,
-      description: "Hasil perankingan ELECTRE telah dihitung resmi dan siap dipublikasikan ke mahasiswa beserta notifikasi email.",
+      description:
+        "Hasil perankingan ELECTRE telah dihitung resmi dan siap dipublikasikan ke mahasiswa beserta notifikasi email.",
       href: `/admin/periods/${cp.id}/publish`,
       badge: "Publikasi",
       badgeVariant: "default",
@@ -159,50 +158,20 @@ async function AdminDashboardContent() {
 
   // Donut chart dataset
   const donutData: StatusDistributionItem[] = [
-    {
-      status: "draft",
-      label: "Draft Mahasiswa",
-      count: draftCount ?? 0,
-      color: "#94a3b8", // slate-400
-    },
-    {
-      status: "submitted",
-      label: "Menunggu Verifikasi",
-      count: pendingVerification ?? 0,
-      color: "#f59e0b", // amber-500
-    },
-    {
-      status: "verified",
-      label: "Terverifikasi",
-      count: totalVerified ?? 0,
-      color: "#3b82f6", // blue-500
-    },
-    {
-      status: "passed",
-      label: "Lolos Seleksi",
-      count: passedCount ?? 0,
-      color: "#10b981", // emerald-500
-    },
-    {
-      status: "not_passed",
-      label: "Tidak Lolos",
-      count: notPassedCount ?? 0,
-      color: "#6b7280", // gray-500
-    },
-    {
-      status: "rejected",
-      label: "Berkas Ditolak",
-      count: rejectedCount ?? 0,
-      color: "#ef4444", // red-500
-    },
+    { status: "draft", label: "Draft Mahasiswa", count: draftCount, color: "#94a3b8" },
+    { status: "submitted", label: "Menunggu Verifikasi", count: pendingVerification, color: "#f59e0b" },
+    { status: "verified", label: "Terverifikasi", count: totalVerified, color: "#0d9488" },
+    { status: "passed", label: "Lolos Seleksi", count: passedCount, color: "#10b981" },
+    { status: "not_passed", label: "Tidak Lolos", count: notPassedCount, color: "#6b7280" },
+    { status: "rejected", label: "Berkas Ditolak", count: rejectedCount, color: "#ef4444" },
   ]
 
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-300">
       {/* Title & Quick Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
             Dashboard Utama
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -211,71 +180,77 @@ async function AdminDashboardContent() {
         </div>
 
         <Link href="/admin/periods">
-          <Button className="gap-2">
+          <Button className="gap-2 font-semibold shrink-0">
             <Calendar className="size-4" />
-            Kelola Periode Beasiswa
+            Kelola Periode
           </Button>
         </Link>
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="shadow-2xs">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Applicants */}
+        <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               Total Pelamar
             </CardTitle>
-            <Users className="size-4 text-muted-foreground" />
+            <div className="size-8 rounded-lg bg-muted flex items-center justify-center">
+              <Users className="size-4 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalApplicants ?? 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Dari seluruh periode beasiswa
-            </p>
+            <div className="text-3xl font-black">{totalApplicants ?? 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Dari seluruh periode beasiswa</p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-2xs border-amber-200 bg-amber-50/20 dark:border-amber-900/50">
+        {/* Needs Verification */}
+        <Card className="shadow-sm border-amber-200/60 bg-amber-50/30">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+            <CardTitle className="text-xs font-bold text-amber-700 uppercase tracking-wider">
               Perlu Verifikasi
             </CardTitle>
-            <AlertTriangle className="size-4 text-amber-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
-              {pendingVerification ?? 0}
+            <div className="size-8 rounded-lg bg-amber-100 flex items-center justify-center">
+              <AlertTriangle className="size-4 text-amber-600" />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Berkas diajukan menunggu peninjauan
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-2xs">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Total Kuota Penerima
-            </CardTitle>
-            <Award className="size-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{totalQuota}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Akumulasi kuota beasiswa tersedia
-            </p>
+            <div className="text-3xl font-black text-amber-700">
+              {pendingVerification}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Berkas diajukan menunggu peninjauan</p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-2xs">
+        {/* Total Quota */}
+        <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              Total Kuota
+            </CardTitle>
+            <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Award className="size-4 text-primary" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-black text-primary">{totalQuota}</div>
+            <p className="text-xs text-muted-foreground mt-1">Akumulasi kuota beasiswa tersedia</p>
+          </CardContent>
+        </Card>
+
+        {/* Cutoff Score */}
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               Garis Batas Lolos
             </CardTitle>
-            <TrendingUp className="size-4 text-emerald-600" />
+            <div className="size-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <TrendingUp className="size-4 text-emerald-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">
+            <div className="text-3xl font-black text-emerald-600">
               {cutoffScore !== null ? (cutoffScore > 0 ? `+${cutoffScore}` : cutoffScore) : "—"}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -285,17 +260,17 @@ async function AdminDashboardContent() {
         </Card>
       </div>
 
-      {/* Middle Section: Action Items ("Perlu Ditindak") & Donut Chart */}
+      {/* Middle Section: Action Items & Donut Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Action Items List */}
+        {/* Left: Action Items */}
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <Sparkles className="size-4 text-amber-500" />
+              <Sparkles className="size-4 text-[oklch(0.72_0.17_55)]" />
               Perlu Ditindak
             </h2>
-            <span className="text-xs text-muted-foreground font-mono">
-              {actionItems.length} tindakan tertunda
+            <span className="text-xs text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded-full">
+              {actionItems.length} tindakan
             </span>
           </div>
 
@@ -304,21 +279,21 @@ async function AdminDashboardContent() {
               {actionItems.map((item) => (
                 <div
                   key={item.id}
-                  className="p-4 rounded-xl border bg-card text-card-foreground shadow-2xs hover:border-primary/40 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                  className="p-4 rounded-xl border bg-card text-card-foreground shadow-sm hover:border-primary/40 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                 >
                   <div className="flex items-start gap-3">
                     <div className="p-2 rounded-lg bg-muted shrink-0 mt-0.5">
                       {item.icon}
                     </div>
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold">{item.title}</span>
                         <span
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                             item.badgeVariant === "destructive"
                               ? "bg-destructive/10 text-destructive"
                               : item.badgeVariant === "warning"
-                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                              ? "bg-amber-500/10 text-amber-600"
                               : "bg-primary/10 text-primary"
                           }`}
                         >
@@ -332,7 +307,7 @@ async function AdminDashboardContent() {
                   </div>
 
                   <Link href={item.href} className="w-full sm:w-auto shrink-0">
-                    <Button size="sm" variant="outline" className="w-full sm:w-auto gap-1 text-xs">
+                    <Button size="sm" variant="outline" className="w-full sm:w-auto gap-1 text-xs font-semibold">
                       Tindak Lanjuti
                       <ArrowRight className="size-3" />
                     </Button>
@@ -342,8 +317,8 @@ async function AdminDashboardContent() {
             </div>
           ) : (
             <Card className="border-dashed bg-muted/20">
-              <CardContent className="py-8 text-center space-y-2">
-                <CheckCircle2 className="size-8 text-emerald-500 mx-auto" />
+              <CardContent className="py-10 text-center space-y-2">
+                <CheckCircle2 className="size-9 text-emerald-500 mx-auto" />
                 <p className="text-sm font-semibold">Semua tugas administrasi up-to-date!</p>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                   Tidak ada berkas yang menunggu verifikasi mendesak ataupun kalkulasi yang tertunda saat ini.
@@ -355,7 +330,7 @@ async function AdminDashboardContent() {
 
         {/* Right: Status Distribution Donut Chart */}
         <div className="lg:col-span-5">
-          <Card className="shadow-2xs h-full flex flex-col justify-between">
+          <Card className="shadow-sm h-full flex flex-col justify-between">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-bold">
                 Distribusi Status Pelamar
@@ -382,9 +357,9 @@ async function AdminDashboardContent() {
           </h2>
           <Link
             href="/admin/periods"
-            className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
+            className="text-xs text-primary font-semibold hover:underline underline-offset-4 flex items-center gap-1"
           >
-            Lihat semua periode
+            Lihat semua
             <ArrowRight className="size-3" />
           </Link>
         </div>
@@ -394,7 +369,7 @@ async function AdminDashboardContent() {
             {periods.slice(0, 6).map((period) => (
               <Card
                 key={period.id}
-                className="hover:border-primary/40 transition-colors shadow-2xs flex flex-col justify-between"
+                className="hover:border-primary/40 transition-all shadow-sm flex flex-col justify-between hover:shadow-md"
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">
@@ -403,17 +378,17 @@ async function AdminDashboardContent() {
                     </CardTitle>
                     <StatusBadge status={period.status} size="sm" />
                   </div>
-                  <CardDescription className="text-xs line-clamp-2">
+                  <CardDescription className="text-xs line-clamp-2 mt-1">
                     {period.deskripsi || "Tidak ada deskripsi"}
                   </CardDescription>
                 </CardHeader>
 
                 <CardContent className="pt-0">
                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t">
-                    <span className="font-mono">Kuota: {period.kuota} Mahasiswa</span>
+                    <span className="font-semibold font-mono">Kuota: {period.kuota} Mhs</span>
                     <Link href={`/admin/periods/${period.id}/overview`}>
-                      <Button variant="ghost" size="xs" className="gap-1 font-semibold">
-                        Buka Workspace
+                      <Button variant="ghost" size="sm" className="gap-1 font-semibold text-xs h-7">
+                        Buka
                         <ArrowRight className="size-3" />
                       </Button>
                     </Link>
@@ -423,13 +398,13 @@ async function AdminDashboardContent() {
             ))}
           </div>
         ) : (
-          <Card className="text-center py-8">
+          <Card className="text-center py-10">
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
                 Belum ada periode beasiswa yang dibuat.
               </p>
               <Link href="/admin/periods">
-                <Button size="sm">Buat Periode Baru</Button>
+                <Button size="sm" className="font-semibold">Buat Periode Baru</Button>
               </Link>
             </CardContent>
           </Card>
@@ -444,26 +419,26 @@ function AdminDashboardFallback() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-2">
-          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-9 w-64" />
           <Skeleton className="h-4 w-96 max-w-full" />
         </div>
-        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-10 w-48" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }, (_, index) => (
-          <div key={index} className="space-y-3 rounded-lg border bg-card p-5">
+          <div key={index} className="space-y-3 rounded-xl border bg-card p-5">
             <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-8 w-1/3" />
+            <Skeleton className="h-9 w-1/3" />
             <Skeleton className="h-3 w-full" />
           </div>
         ))}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-4 rounded-lg border bg-card p-5">
+        <div className="space-y-4 rounded-xl border bg-card p-5">
           <Skeleton className="h-6 w-40" />
           <Skeleton className="h-40 w-full" />
         </div>
-        <div className="space-y-4 rounded-lg border bg-card p-5">
+        <div className="space-y-4 rounded-xl border bg-card p-5">
           <Skeleton className="h-6 w-48" />
           <Skeleton className="h-40 w-full" />
         </div>
@@ -471,3 +446,4 @@ function AdminDashboardFallback() {
     </div>
   )
 }
+

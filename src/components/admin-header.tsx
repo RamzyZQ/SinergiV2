@@ -11,11 +11,14 @@ import {
   X,
   LayoutDashboard,
   ScrollText,
+  Home,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { StatusBadge } from "@/components/status-badge"
 import { createClient } from "@/lib/supabase/client"
+import { SinergiLogo } from "@/components/sinergi-logo"
+import { cn } from "@/lib/utils"
 
 interface PeriodOption {
   id: string
@@ -89,17 +92,18 @@ export function AdminHeader({
     }
   }
 
-  const initials = userName
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "A"
+  const initials =
+    userName
+      .split(" ")
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "A"
 
   return (
-    <header className="sticky top-0 z-20 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-2xs">
+    <header className="sticky top-0 z-20 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-sm">
       <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-        {/* Left: Mobile Toggle & Breadcrumb */}
+        {/* Left: Mobile Toggle + Logo (mobile) + Breadcrumb (desktop) */}
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -111,11 +115,18 @@ export function AdminHeader({
             {mobileNavOpen ? <X className="size-5" /> : <Menu className="size-5" />}
           </Button>
 
+          {/* Mobile logo */}
+          <div className="lg:hidden">
+            <Link href="/admin" className="focus-visible:outline-none">
+              <SinergiLogo size="sm" subtitle={false} />
+            </Link>
+          </div>
+
           {/* Breadcrumbs desktop */}
           <nav aria-label="Breadcrumb" className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
             {breadcrumbs.map((crumb, idx) => (
               <React.Fragment key={crumb.href}>
-                {idx > 0 && <ChevronRight className="size-3.5 opacity-50 shrink-0" />}
+                {idx > 0 && <ChevronRight className="size-3.5 opacity-40 shrink-0" />}
                 {idx === breadcrumbs.length - 1 ? (
                   <span className="font-semibold text-foreground truncate max-w-[180px]">
                     {crumb.label}
@@ -133,17 +144,17 @@ export function AdminHeader({
           </nav>
         </div>
 
-        {/* Right: Active Period Selector + User Profile */}
+        {/* Right: Period Selector + User Profile */}
         <div className="flex items-center gap-3 sm:gap-4">
-          {/* Period Selector in Header */}
+          {/* Period Selector */}
           {periods.length > 0 && (
-            <div className="flex items-center gap-2 bg-muted/50 border rounded-lg px-2.5 py-1">
+            <div className="flex items-center gap-2 bg-muted/50 border rounded-xl px-2.5 py-1.5">
               <Calendar className="size-3.5 text-muted-foreground shrink-0 hidden sm:block" />
               <select
                 aria-label="Pilih Periode Aktif"
                 value={selectedPeriod?.id || ""}
                 onChange={handlePeriodChange}
-                className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer max-w-[150px] sm:max-w-[200px] truncate"
+                className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate"
               >
                 {periods.map((p) => (
                   <option key={p.id} value={p.id} className="bg-popover text-popover-foreground">
@@ -161,15 +172,18 @@ export function AdminHeader({
           <div className="relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="flex items-center gap-2 rounded-full p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Menu admin"
               aria-expanded={menuOpen}
             >
-              <Avatar className="size-8">
+              <Avatar className="size-7">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
                   {initials}
                 </AvatarFallback>
               </Avatar>
+              <span className="hidden sm:block text-sm font-medium max-w-[100px] truncate">
+                {userName.split(" ")[0]}
+              </span>
             </button>
 
             {menuOpen && (
@@ -178,23 +192,23 @@ export function AdminHeader({
                   className="fixed inset-0 z-40"
                   onClick={() => setMenuOpen(false)}
                 />
-                <div className="absolute right-0 mt-2 w-56 rounded-lg border bg-popover text-popover-foreground shadow-lg z-50 p-1.5 animate-in fade-in-50 zoom-in-95">
-                  <div className="px-2.5 py-2 border-b border-border/50">
+                <div className="absolute right-0 mt-2 w-56 rounded-xl border bg-popover text-popover-foreground shadow-lg z-50 p-1.5 animate-in fade-in-50 zoom-in-95">
+                  <div className="px-3 py-2.5 border-b border-border/50 mb-1">
                     <p className="text-sm font-semibold truncate">{userName}</p>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
                       {userEmail}
                     </p>
-                    <span className="inline-block mt-1 text-[10px] font-bold uppercase bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                      Role: Admin
+                    <span className="inline-block mt-1.5 text-[10px] font-bold uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                      Admin
                     </span>
                   </div>
 
                   <div className="py-1">
                     <button
                       onClick={handleSignOut}
-                      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-medium transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg text-rose-600 hover:bg-rose-50 font-medium transition-colors text-left"
                     >
-                      <LogOut className="size-3.5" />
+                      <LogOut className="size-4" />
                       Keluar
                     </button>
                   </div>
@@ -208,35 +222,32 @@ export function AdminHeader({
       {/* Mobile Drawer Navigation */}
       {mobileNavOpen && (
         <div className="lg:hidden border-t bg-card px-4 py-3 space-y-1 shadow-inner">
-          <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase">
+          <div className="px-2 py-1.5 text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
             Menu Admin
           </div>
-          <Link
-            href="/admin"
-            onClick={() => setMobileNavOpen(false)}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium hover:bg-muted"
-          >
-            <LayoutDashboard className="size-4" />
-            Dashboard
-          </Link>
-          <Link
-            href="/admin/periods"
-            onClick={() => setMobileNavOpen(false)}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium hover:bg-muted"
-          >
-            <Calendar className="size-4" />
-            Kelola Periode
-          </Link>
-          <Link
-            href="/admin/audit"
-            onClick={() => setMobileNavOpen(false)}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium hover:bg-muted"
-          >
-            <ScrollText className="size-4" />
-            Audit Log
-          </Link>
+          {[
+            { href: "/admin", label: "Dashboard", icon: Home },
+            { href: "/admin/periods", label: "Kelola Periode", icon: Calendar },
+            { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
+          ].map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setMobileNavOpen(false)}
+              className={cn(
+                "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                pathname === href || (href !== "/admin" && pathname.startsWith(href))
+                  ? "bg-primary/10 text-primary font-semibold"
+                  : "hover:bg-muted text-foreground/70"
+              )}
+            >
+              <Icon className="size-4" />
+              {label}
+            </Link>
+          ))}
         </div>
       )}
     </header>
   )
 }
+
