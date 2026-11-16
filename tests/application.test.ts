@@ -73,13 +73,30 @@ describe('Application Wizard & Scale Mapping Logic', () => {
         {
           criteria_id: '323e4567-e89b-12d3-a456-426614174000',
           nilai_mentah: 3.8,
-          skor: 4,
+          selected_scale_id: null,
         },
       ],
     };
 
     const parsed = saveApplicationDraftSchema.safeParse(validPayload);
     expect(parsed.success).toBe(true);
+  });
+
+  it('rejects score values supplied by the student client', () => {
+    const parsed = saveApplicationDraftSchema.safeParse({
+      application_id: '123e4567-e89b-12d3-a456-426614174000',
+      period_id: '223e4567-e89b-12d3-a456-426614174000',
+      values: [
+        {
+          criteria_id: '323e4567-e89b-12d3-a456-426614174000',
+          nilai_mentah: 3.8,
+          selected_scale_id: null,
+          skor: 100,
+        },
+      ],
+    });
+
+    expect(parsed.success).toBe(false);
   });
 
   it('rejects invalid semester values outside 1-14', () => {

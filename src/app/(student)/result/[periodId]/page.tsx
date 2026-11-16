@@ -132,18 +132,40 @@ export default async function StudentResultPage({ params }: StudentResultPagePro
   const cutoffScore =
     hasilMatriks.cutoffNetScore ?? snapshotThreshold.cutoff_net_score ?? 0
 
-  // Fetch criteria
-  const { data: criteriaList } = await supabase
-    .from("criteria")
-    .select("id, nama, tipe, bobot, urutan")
-    .eq("period_id", periodId)
-    .order("urutan", { ascending: true })
+  // Fetch only student-visible criterion names
+  const { data: formRows, error: formError } = await supabase.rpc(
+    "get_student_application_form",
+    { p_application_id: application.id }
+  )
+
+  if (formError) {
+    console.error("Failed to load student result criteria:", formError)
+    throw new Error("Gagal memuat rincian hasil seleksi.")
+  }
+
+  const criteriaById = new Map<string, { id: string; nama: string; urutan: number }>()
+  for (const row of formRows || []) {
+    if (!criteriaById.has(row.criteria_id)) {
+      criteriaById.set(row.criteria_id, {
+        id: row.criteria_id,
+        nama: row.nama,
+        urutan: row.urutan,
+      })
+    }
+  }
+  const criteriaList = Array.from(criteriaById.values())
+    .sort((a, b) => a.urutan - b.urutan)
 
   // Fetch application values
-  const { data: appValues } = await supabase
+  const { data: appValues, error: appValuesError } = await supabase
     .from("application_values")
     .select("criteria_id, nilai_mentah, skor")
     .eq("application_id", application.id)
+
+  if (appValuesError) {
+    console.error("Failed to load student result values:", appValuesError)
+    throw new Error("Gagal memuat nilai hasil seleksi.")
+  }
 
   const valueMap = new Map((appValues || []).map((v) => [v.criteria_id, v]))
 
@@ -152,8 +174,6 @@ export default async function StudentResultPage({ params }: StudentResultPagePro
     return {
       id: c.id,
       name: c.nama,
-      type: c.tipe as "benefit" | "cost",
-      weight: Number(c.bobot),
       rawScore: v?.nilai_mentah !== null && v?.nilai_mentah !== undefined ? Number(v.nilai_mentah) : null,
       scaleScore: Number(v?.skor ?? 0),
     }

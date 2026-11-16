@@ -438,6 +438,28 @@ export type Database = {
         Args: Record<string, never>;
         Returns: boolean;
       };
+      get_student_application_form: {
+        Args: {
+          p_application_id: string;
+        };
+        Returns: {
+          criteria_id: string;
+          nama: string;
+          urutan: number;
+          nilai_mentah: number | null;
+          scale_id: string | null;
+          scale_label: string | null;
+          selected_scale_id: string | null;
+        }[];
+      };
+      save_student_application_values: {
+        Args: {
+          p_application_id: string;
+          p_period_id: string;
+          p_values: Json;
+        };
+        Returns: undefined;
+      };
     };
     Enums: {
       period_status:

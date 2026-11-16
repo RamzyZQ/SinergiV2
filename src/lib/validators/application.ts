@@ -34,8 +34,8 @@ export function findScoreFromScale(scales: ScaleItem[], rawValue: number): numbe
 export const applicationCriterionValueSchema = z.object({
   criteria_id: z.string().uuid(),
   nilai_mentah: z.number().nullable(),
-  skor: z.number().nullable(),
-});
+  selected_scale_id: z.string().uuid().nullable(),
+}).strict();
 
 export const saveApplicationDraftSchema = z.object({
   application_id: z.string().uuid(),

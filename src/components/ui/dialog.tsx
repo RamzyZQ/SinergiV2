@@ -1,8 +1,21 @@
 "use client"
 
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+function subscribeToPortalTarget() {
+  return () => {}
+}
+
+function getPortalTarget() {
+  return document.body
+}
+
+function getServerPortalTarget() {
+  return null
+}
 
 interface DialogContextType {
   open: boolean
@@ -71,6 +84,11 @@ function DialogContent({
   ...props
 }: React.ComponentProps<"div">) {
   const { open, onOpenChange } = useDialog()
+  const portalTarget = React.useSyncExternalStore(
+    subscribeToPortalTarget,
+    getPortalTarget,
+    getServerPortalTarget
+  )
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -88,9 +106,9 @@ function DialogContent({
     }
   }, [open, onOpenChange])
 
-  if (!open) return null
+  if (!open || !portalTarget) return null
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in-0 duration-200">
       {/* Backdrop */}
       <div
@@ -104,7 +122,7 @@ function DialogContent({
         role="dialog"
         aria-modal="true"
         className={cn(
-          "relative z-50 w-full max-w-lg rounded-xl border bg-background p-6 shadow-xl animate-in zoom-in-95 duration-200 sm:rounded-2xl",
+          "relative z-50 max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-xl border bg-background p-6 shadow-xl animate-in zoom-in-95 duration-200 sm:rounded-2xl",
           className
         )}
         {...props}
@@ -119,7 +137,8 @@ function DialogContent({
           <X className="size-4" />
         </button>
       </div>
-    </div>
+    </div>,
+    portalTarget
   )
 }
 

@@ -53,8 +53,6 @@ export interface StudentResultViewProps {
     criteria: Array<{
       id: string
       name: string
-      type: "benefit" | "cost"
-      weight: number
       rawScore: number | null
       scaleScore: number
       scaleLabel?: string
@@ -495,7 +493,7 @@ export function StudentResultView({
                 </div>
 
                 <div className="flex items-center justify-between text-xs pt-1 border-t text-muted-foreground">
-                  <span>Bobot Kriteria: <b>{c.weight}%</b></span>
+                  <span>Hasil penilaian</span>
                   <span>
                     Skor: <b className="text-foreground text-sm">{c.scaleScore}</b> / 5
                   </span>

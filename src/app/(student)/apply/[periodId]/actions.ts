@@ -40,7 +40,7 @@ export async function saveApplicationDraft(
   // Verify application exists, belongs to user, and is in draft
   const { data: app, error: appErr } = await supabase
     .from("applications")
-    .select("id, status, period_id, scholarship_periods(status)")
+    .select("id, status, period_id")
     .eq("id", parsed.data.application_id)
     .eq("user_id", user.id)
     .single()
@@ -56,9 +56,26 @@ export async function saveApplicationDraft(
     }
   }
 
+  if (app.period_id !== parsed.data.period_id) {
+    return { success: false, error: "Periode pendaftaran tidak sesuai." }
+  }
+
+  const { data: period, error: periodErr } = await supabase
+    .from("scholarship_periods")
+    .select("status")
+    .eq("id", app.period_id)
+    .single()
+
+  if (periodErr || !period || period.status !== "open") {
+    return {
+      success: false,
+      error: "Periode pendaftaran sudah ditutup dan tidak dapat diubah.",
+    }
+  }
+
   // Update profile identity if provided
   if (parsed.data.nama || parsed.data.nim || parsed.data.prodi || parsed.data.semester) {
-    await supabase
+    const { error: profileErr } = await supabase
       .from("profiles")
       .update({
         nama: parsed.data.nama,
@@ -68,37 +85,37 @@ export async function saveApplicationDraft(
         updated_at: new Date().toISOString(),
       })
       .eq("id", user.id)
-  }
 
-  // Upsert criteria values
-  if (parsed.data.values && parsed.data.values.length > 0) {
-    for (const val of parsed.data.values) {
-      if (val.nilai_mentah !== null && val.skor !== null) {
-        const { error: upsertErr } = await supabase
-          .from("application_values")
-          .upsert(
-            {
-              application_id: parsed.data.application_id,
-              criteria_id: val.criteria_id,
-              nilai_mentah: val.nilai_mentah,
-              skor: val.skor,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "application_id,criteria_id" }
-          )
-
-        if (upsertErr) {
-          console.error("Error upserting value:", upsertErr)
-        }
-      }
+    if (profileErr) {
+      console.error("Error updating student profile:", profileErr)
+      return { success: false, error: "Gagal menyimpan data identitas." }
     }
   }
 
+  const { error: valuesErr } = await supabase.rpc(
+    "save_student_application_values",
+    {
+      p_application_id: parsed.data.application_id,
+      p_period_id: parsed.data.period_id,
+      p_values: parsed.data.values,
+    }
+  )
+
+  if (valuesErr) {
+    console.error("Error saving student application values:", valuesErr)
+    return { success: false, error: "Gagal menyimpan data kriteria." }
+  }
+
   // Touch application updated_at
-  await supabase
+  const { error: updateErr } = await supabase
     .from("applications")
     .update({ updated_at: new Date().toISOString() })
     .eq("id", parsed.data.application_id)
+
+  if (updateErr) {
+    console.error("Error updating application timestamp:", updateErr)
+    return { success: false, error: "Gagal memperbarui waktu penyimpanan." }
+  }
 
   const savedAt = new Date().toLocaleTimeString("id-ID", {
     hour: "2-digit",
@@ -132,7 +149,7 @@ export async function submitApplication(
   // Verify application
   const { data: app, error: appErr } = await supabase
     .from("applications")
-    .select("id, status, period_id, scholarship_periods(status, nama)")
+    .select("id, status, period_id")
     .eq("id", applicationId)
     .eq("user_id", user.id)
     .single()
@@ -146,6 +163,10 @@ export async function submitApplication(
       success: false,
       error: "Pendaftaran ini sudah dikirim sebelumnya.",
     }
+  }
+
+  if (app.period_id !== periodId) {
+    return { success: false, error: "Periode pendaftaran tidak sesuai." }
   }
 
   // Check period status
@@ -163,24 +184,27 @@ export async function submitApplication(
   }
 
   // Check all criteria have been filled
-  const { data: criteriaList } = await supabase
-    .from("criteria")
-    .select("id, nama")
-    .eq("period_id", periodId)
-
-  const { data: filledValues } = await supabase
-    .from("application_values")
-    .select("criteria_id, skor")
-    .eq("application_id", applicationId)
-
-  const filledCriteriaIds = new Set(
-    (filledValues || [])
-      .filter((v) => v.skor !== null && v.skor !== undefined)
-      .map((v) => v.criteria_id)
+  const { data: formRows, error: formError } = await supabase.rpc(
+    "get_student_application_form",
+    { p_application_id: applicationId }
   )
 
-  const missingCriteria = (criteriaList || []).filter(
-    (c) => !filledCriteriaIds.has(c.id)
+  if (formError) {
+    console.error("Failed to validate student application form:", formError)
+    return { success: false, error: "Gagal memeriksa kelengkapan data." }
+  }
+
+  const criteriaStatus = new Map<string, { nama: string; filled: boolean }>()
+  for (const row of formRows || []) {
+    if (!criteriaStatus.has(row.criteria_id)) {
+      criteriaStatus.set(row.criteria_id, {
+        nama: row.nama,
+        filled: row.nilai_mentah !== null,
+      })
+    }
+  }
+  const missingCriteria = Array.from(criteriaStatus.values()).filter(
+    (criterion) => !criterion.filled
   )
 
   if (missingCriteria.length > 0) {

@@ -47,19 +47,11 @@ import {
 
 export interface CriteriaWithScales {
   id: string
-  period_id: string
   nama: string
-  tipe: "benefit" | "cost"
-  bobot: number
   urutan: number
-  sumber_nilai: "input" | "document"
   criteria_scales: Array<{
     id: string
-    criteria_id: string
     label: string
-    nilai_min: number
-    nilai_max: number
-    skor: number
   }>
 }
 
@@ -75,7 +67,6 @@ export interface ApplicationWizardProps {
     id: string
     status: string
     submitted_at: string | null
-    catatan_admin: string | null
   }
   initialProfile: {
     nama: string
@@ -84,7 +75,10 @@ export interface ApplicationWizardProps {
     semester: number | null
   }
   criteriaList: CriteriaWithScales[]
-  initialValues: Record<string, { nilai_mentah: number | null; skor: number | null }>
+  initialValues: Record<
+    string,
+    { nilai_mentah: number | null; selected_scale_id: string | null }
+  >
   initialDocuments: Array<{
     id: string
     jenis: string
@@ -131,7 +125,7 @@ export function ApplicationWizard({
   initialDocuments,
 }: ApplicationWizardProps) {
   const router = useRouter()
-  const isReadOnly = application.status !== "draft"
+  const isReadOnly = application.status !== "draft" || period.status !== "open"
 
   // Step state (1 to 5)
   const [currentStep, setCurrentStep] = React.useState(1)
@@ -144,9 +138,12 @@ export function ApplicationWizard({
     initialProfile.semester ?? ""
   )
 
-  // Criteria values: mapping from criteria_id -> { nilai_mentah, skor }
+  // Criteria values: raw input and the selected student-visible scale
   const [values, setValues] = React.useState<
-    Record<string, { nilai_mentah: number | null; skor: number | null }>
+    Record<
+      string,
+      { nilai_mentah: number | null; selected_scale_id: string | null }
+    >
   >(initialValues)
 
   // Documents
@@ -156,6 +153,7 @@ export function ApplicationWizard({
   const [savingStatus, setSavingStatus] = React.useState<
     "saved" | "saving" | "unsaved" | "error"
   >("saved")
+  const [saveError, setSaveError] = React.useState<string | null>(null)
   const [lastSavedTime, setLastSavedTime] = React.useState<string | null>(null)
   const [submitDialogOpen, setSubmitDialogOpen] = React.useState(false)
   const [submitting, setSubmitting] = React.useState(false)
@@ -211,13 +209,14 @@ export function ApplicationWizard({
 
   // Auto-save logic debounced
   const performSave = React.useCallback(async () => {
-    if (isReadOnly) return
+    if (isReadOnly) return true
 
     setSavingStatus("saving")
+    setSaveError(null)
     const valuesArray = Object.entries(values).map(([criteria_id, v]) => ({
       criteria_id,
       nilai_mentah: v.nilai_mentah,
-      skor: v.skor,
+      selected_scale_id: v.selected_scale_id,
     }))
 
     const res = await saveApplicationDraft({
@@ -232,9 +231,13 @@ export function ApplicationWizard({
 
     if (res.success && res.data) {
       setSavingStatus("saved")
+      setSaveError(null)
       setLastSavedTime(res.data.savedAt)
+      return true
     } else {
       setSavingStatus("error")
+      setSaveError(res.error || "Draf gagal disimpan.")
+      return false
     }
   }, [
     isReadOnly,
@@ -265,68 +268,36 @@ export function ApplicationWizard({
   }, [nama, nim, prodi, semester, values, performSave, isReadOnly])
 
   // Handler for scale dropdown change
-  const handleScaleSelect = (
-    criterionId: string,
-    scaleId: string,
-    scales: CriteriaWithScales["criteria_scales"]
-  ) => {
+  const handleScaleSelect = (criterionId: string, scaleId: string) => {
     if (isReadOnly) return
     setSavingStatus("unsaved")
-    const chosen = scales.find((s) => s.id === scaleId)
-    if (!chosen) {
-      setValues((prev) => ({
-        ...prev,
-        [criterionId]: { nilai_mentah: null, skor: null },
-      }))
-      return
-    }
-
     setValues((prev) => ({
       ...prev,
       [criterionId]: {
-        nilai_mentah: chosen.nilai_min,
-        skor: chosen.skor,
+        nilai_mentah: null,
+        selected_scale_id: scaleId || null,
       },
     }))
   }
 
   // Handler for direct numeric input
-  const handleNumericInput = (
-    criterionId: string,
-    valStr: string,
-    scales: CriteriaWithScales["criteria_scales"]
-  ) => {
+  const handleNumericInput = (criterionId: string, valStr: string) => {
     if (isReadOnly) return
     setSavingStatus("unsaved")
     const num = parseFloat(valStr)
     if (isNaN(num)) {
       setValues((prev) => ({
         ...prev,
-        [criterionId]: { nilai_mentah: null, skor: null },
+        [criterionId]: { nilai_mentah: null, selected_scale_id: null },
       }))
       return
-    }
-
-    let calculatedScore = num
-    if (scales && scales.length > 0) {
-      const matched = scales.find(
-        (s) => num >= s.nilai_min && num <= s.nilai_max
-      )
-      if (matched) {
-        calculatedScore = matched.skor
-      } else {
-        const sorted = [...scales].sort((a, b) => a.nilai_min - b.nilai_min)
-        if (num < sorted[0].nilai_min) calculatedScore = sorted[0].skor
-        else if (num > sorted[sorted.length - 1].nilai_max)
-          calculatedScore = sorted[sorted.length - 1].skor
-      }
     }
 
     setValues((prev) => ({
       ...prev,
       [criterionId]: {
         nilai_mentah: num,
-        skor: calculatedScore,
+        selected_scale_id: null,
       },
     }))
   }
@@ -398,6 +369,13 @@ export function ApplicationWizard({
     setSubmitting(true)
     setSubmitError(null)
 
+    const saved = await performSave()
+    if (!saved) {
+      setSubmitting(false)
+      setSubmitError("Draf belum berhasil disimpan. Periksa koneksi lalu coba kembali.")
+      return
+    }
+
     const res = await submitApplication(application.id, period.id)
     setSubmitting(false)
 
@@ -413,7 +391,7 @@ export function ApplicationWizard({
   // Calculate completeness for review step
   const totalCriteriaCount = criteriaList.length
   const filledCriteriaCount = Object.values(values).filter(
-    (v) => v.skor !== null && v.skor !== undefined
+    (v) => v.nilai_mentah !== null || v.selected_scale_id !== null
   ).length
   const mandatoryDocsCount = DEFAULT_DOC_TYPES.filter((d) => d.required).length
   const uploadedMandatoryDocsCount = DEFAULT_DOC_TYPES.filter(
@@ -444,15 +422,23 @@ export function ApplicationWizard({
           <FileCheck className="size-5 text-blue-600 mt-0.5 shrink-0" />
           <div className="space-y-1">
             <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-200">
-              Formulir Pendaftaran Sudah Terkirim
+              {application.status !== "draft"
+                ? "Formulir Pendaftaran Sudah Terkirim"
+                : "Pendaftaran Tidak Lagi Bisa Diubah"}
             </h4>
             <p className="text-xs text-blue-700 dark:text-blue-300">
-              Berkas Anda telah diajukan pada{" "}
-              {application.submitted_at
-                ? new Date(application.submitted_at).toLocaleString("id-ID")
-                : "periode aktif"}{" "}
-              dengan status <StatusBadge status={application.status} size="sm" />.
-              Data berada dalam mode hanya baca (read-only) selama proses verifikasi panitia.
+              {application.status !== "draft" ? (
+                <>
+                  Berkas Anda telah diajukan pada{" "}
+                  {application.submitted_at
+                    ? new Date(application.submitted_at).toLocaleString("id-ID")
+                    : "periode aktif"}{" "}
+                  dengan status <StatusBadge status={application.status} size="sm" />.
+                  Data berada dalam mode hanya baca selama proses verifikasi panitia.
+                </>
+              ) : (
+                "Periode pendaftaran sudah ditutup. Draf masih dapat dilihat, tetapi tidak dapat diubah."
+              )}
             </p>
           </div>
         </div>
@@ -474,7 +460,11 @@ export function ApplicationWizard({
 
         {/* Live Auto-save indicator */}
         {!isReadOnly && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground self-start sm:self-auto bg-muted/40 px-3 py-1.5 rounded-full border">
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2 text-xs text-muted-foreground self-start sm:self-auto bg-muted/40 px-3 py-1.5 rounded-full border"
+          >
             {savingStatus === "saving" && (
               <>
                 <Loader2 className="size-3.5 animate-spin text-primary" />
@@ -500,7 +490,9 @@ export function ApplicationWizard({
             {savingStatus === "error" && (
               <>
                 <AlertTriangle className="size-3.5 text-rose-500" />
-                <span className="text-rose-600 font-medium">Gagal simpan</span>
+                <span className="text-rose-600 font-medium">
+                  {saveError || "Gagal simpan"}
+                </span>
               </>
             )}
           </div>
@@ -511,7 +503,7 @@ export function ApplicationWizard({
       <div className="space-y-3 bg-card p-4 rounded-xl border shadow-2xs">
         <div className="flex justify-between items-center text-xs font-medium text-muted-foreground px-1">
           <span>Langkah {currentStep} dari 5</span>
-          <span>{Math.round(progressPercentage)}% Selesai</span>
+          <span>{Math.round(progressPercentage)}% dari alur</span>
         </div>
         <Progress value={progressPercentage} className="h-2" />
 
@@ -527,7 +519,9 @@ export function ApplicationWizard({
                 key={s.num}
                 type="button"
                 onClick={() => setCurrentStep(s.num)}
-                className={`flex flex-col items-center py-2 px-1 rounded-lg text-xs font-medium transition-all ${
+                aria-current={isCurrent ? "step" : undefined}
+                aria-label={`Langkah ${s.num}: ${s.title}`}
+                className={`flex min-h-11 flex-col items-center justify-center py-2 px-1 rounded-lg text-xs font-medium transition-all ${
                   isCurrent
                     ? "bg-primary/10 text-primary font-semibold border border-primary/30"
                     : isDone
@@ -644,44 +638,28 @@ export function ApplicationWizard({
                       key={criterion.id}
                       className="p-4 rounded-xl border bg-card space-y-2"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <Label
-                          htmlFor={`crit-${criterion.id}`}
-                          className="font-semibold text-sm"
-                        >
-                          {criterion.nama}
-                        </Label>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                          Bobot: {criterion.bobot}% ({criterion.tipe})
-                        </span>
-                      </div>
+                      <Label
+                        htmlFor={`crit-${criterion.id}`}
+                        className="font-semibold text-sm"
+                      >
+                        {criterion.nama}
+                      </Label>
 
                       {hasScales ? (
                         <div className="space-y-1.5">
                           <select
                             id={`crit-${criterion.id}`}
                             disabled={isReadOnly}
-                            value={
-                              currentValue?.skor !== null &&
-                              currentValue?.skor !== undefined
-                                ? criterion.criteria_scales.find(
-                                    (s) => s.skor === currentValue.skor
-                                  )?.id || ""
-                                : ""
-                            }
+                            value={currentValue?.selected_scale_id ?? ""}
                             onChange={(e) =>
-                              handleScaleSelect(
-                                criterion.id,
-                                e.target.value,
-                                criterion.criteria_scales
-                              )
+                              handleScaleSelect(criterion.id, e.target.value)
                             }
                             className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-2xs focus:outline-none focus:ring-2 focus:ring-ring"
                           >
                             <option value="">-- Pilih Rentang Nilai --</option>
                             {criterion.criteria_scales.map((scale) => (
                               <option key={scale.id} value={scale.id}>
-                                {scale.label} (Skor: {scale.skor})
+                                {scale.label}
                               </option>
                             ))}
                           </select>
@@ -700,8 +678,7 @@ export function ApplicationWizard({
                             onChange={(e) =>
                               handleNumericInput(
                                 criterion.id,
-                                e.target.value,
-                                criterion.criteria_scales
+                                e.target.value
                               )
                             }
                             placeholder="Masukkan nilai (misal: 3.75)"
@@ -736,7 +713,7 @@ export function ApplicationWizard({
             </div>
             <CardTitle className="text-lg">Kondisi Ekonomi & Keluarga</CardTitle>
             <CardDescription>
-              Informasi penghasilan dan tanggungan orang tua untuk menentukan kriteria biaya (Cost)
+              Isi informasi penghasilan dan tanggungan orang tua sesuai dokumen pendukung.
             </CardDescription>
           </CardHeader>
 
@@ -761,44 +738,28 @@ export function ApplicationWizard({
                       key={criterion.id}
                       className="p-4 rounded-xl border bg-card space-y-2"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <Label
-                          htmlFor={`crit-${criterion.id}`}
-                          className="font-semibold text-sm"
-                        >
-                          {criterion.nama}
-                        </Label>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                          Bobot: {criterion.bobot}% ({criterion.tipe})
-                        </span>
-                      </div>
+                      <Label
+                        htmlFor={`crit-${criterion.id}`}
+                        className="font-semibold text-sm"
+                      >
+                        {criterion.nama}
+                      </Label>
 
                       {hasScales ? (
                         <div className="space-y-1.5">
                           <select
                             id={`crit-${criterion.id}`}
                             disabled={isReadOnly}
-                            value={
-                              currentValue?.skor !== null &&
-                              currentValue?.skor !== undefined
-                                ? criterion.criteria_scales.find(
-                                    (s) => s.skor === currentValue.skor
-                                  )?.id || ""
-                                : ""
-                            }
+                            value={currentValue?.selected_scale_id ?? ""}
                             onChange={(e) =>
-                              handleScaleSelect(
-                                criterion.id,
-                                e.target.value,
-                                criterion.criteria_scales
-                              )
+                              handleScaleSelect(criterion.id, e.target.value)
                             }
                             className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-2xs focus:outline-none focus:ring-2 focus:ring-ring"
                           >
                             <option value="">-- Pilih Rentang Penghasilan / Kategori --</option>
                             {criterion.criteria_scales.map((scale) => (
                               <option key={scale.id} value={scale.id}>
-                                {scale.label} (Skor: {scale.skor})
+                                {scale.label}
                               </option>
                             ))}
                           </select>
@@ -816,8 +777,7 @@ export function ApplicationWizard({
                             onChange={(e) =>
                               handleNumericInput(
                                 criterion.id,
-                                e.target.value,
-                                criterion.criteria_scales
+                                e.target.value
                               )
                             }
                             placeholder="Contoh: 2000000"
@@ -869,44 +829,28 @@ export function ApplicationWizard({
                     key={criterion.id}
                     className="p-4 rounded-xl border bg-card space-y-2"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <Label
-                        htmlFor={`crit-${criterion.id}`}
-                        className="font-semibold text-sm"
-                      >
-                        {criterion.nama}
-                      </Label>
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                        Bobot: {criterion.bobot}% ({criterion.tipe})
-                      </span>
-                    </div>
+                    <Label
+                      htmlFor={`crit-${criterion.id}`}
+                      className="font-semibold text-sm"
+                    >
+                      {criterion.nama}
+                    </Label>
 
                     {hasScales ? (
                       <div className="space-y-1.5">
                         <select
                           id={`crit-${criterion.id}`}
                           disabled={isReadOnly}
-                          value={
-                            currentValue?.skor !== null &&
-                            currentValue?.skor !== undefined
-                              ? criterion.criteria_scales.find(
-                                  (s) => s.skor === currentValue.skor
-                                )?.id || ""
-                              : ""
-                          }
+                          value={currentValue?.selected_scale_id ?? ""}
                           onChange={(e) =>
-                            handleScaleSelect(
-                              criterion.id,
-                              e.target.value,
-                              criterion.criteria_scales
-                            )
+                            handleScaleSelect(criterion.id, e.target.value)
                           }
                           className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-2xs focus:outline-none focus:ring-2 focus:ring-ring"
                         >
                           <option value="">-- Pilih Tingkat Prestasi / Pengalaman --</option>
                           {criterion.criteria_scales.map((scale) => (
                             <option key={scale.id} value={scale.id}>
-                              {scale.label} (Skor: {scale.skor})
+                              {scale.label}
                             </option>
                           ))}
                         </select>
@@ -924,11 +868,10 @@ export function ApplicationWizard({
                           onChange={(e) =>
                             handleNumericInput(
                               criterion.id,
-                              e.target.value,
-                              criterion.criteria_scales
+                              e.target.value
                             )
                           }
-                          placeholder="Masukkan angka capaian / skor"
+                          placeholder="Masukkan angka capaian"
                         />
                       </div>
                     )}
@@ -1230,32 +1173,30 @@ export function ApplicationWizard({
             {/* Criteria summary */}
             <div className="border rounded-xl p-4 bg-muted/10 space-y-2">
               <h5 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Rincian Nilai Kriteria Pilihan
+                Ringkasan Isian Kriteria
               </h5>
               <div className="divide-y text-xs">
                 {criteriaList.map((c) => {
                   const val = values[c.id]
-                  const scale = c.criteria_scales.find((s) => s.skor === val?.skor)
+                  const scale = c.criteria_scales.find(
+                    (s) => s.id === val?.selected_scale_id
+                  )
+                  const displayValue = scale?.label ??
+                    (val?.nilai_mentah !== null && val?.nilai_mentah !== undefined
+                      ? `Nilai: ${val.nilai_mentah}`
+                      : "Belum diisi")
 
                   return (
                     <div
                       key={c.id}
                       className="py-2 flex items-center justify-between gap-2"
                     >
-                      <div>
+                      <div className="min-w-0">
                         <span className="font-medium text-foreground block">
                           {c.nama}
                         </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {scale ? scale.label : val?.nilai_mentah ? `Nilai: ${val.nilai_mentah}` : "Belum diisi"}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-bold text-primary">
-                          Skor: {val?.skor ?? "-"}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground block">
-                          Bobot {c.bobot}%
+                        <span className="text-[11px] text-muted-foreground block">
+                          {displayValue}
                         </span>
                       </div>
                     </div>

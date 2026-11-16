@@ -45,7 +45,7 @@ export default async function ApplyPage({ params }: ApplyPageProps) {
   // 2. Fetch or create application row
   let { data: application } = await supabase
     .from("applications")
-    .select("id, status, submitted_at, catatan_admin")
+    .select("id, status, submitted_at")
     .eq("period_id", periodId)
     .eq("user_id", user.id)
     .maybeSingle()
@@ -63,7 +63,7 @@ export default async function ApplyPage({ params }: ApplyPageProps) {
         period_id: periodId,
         status: "draft",
       })
-      .select("id, status, submitted_at, catatan_admin")
+      .select("id, status, submitted_at")
       .single()
 
     if (createErr || !newApp) {
@@ -74,65 +74,50 @@ export default async function ApplyPage({ params }: ApplyPageProps) {
     application = newApp
   }
 
-  // 3. Fetch criteria and criteria_scales
-  const { data: rawCriteria } = await supabase
-    .from("criteria")
-    .select("id, period_id, nama, tipe, bobot, urutan, sumber_nilai")
-    .eq("period_id", periodId)
-    .order("urutan", { ascending: true })
+  // 3. Fetch only student-visible criteria and existing input values
+  const { data: formRows, error: formError } = await supabase.rpc(
+    "get_student_application_form",
+    { p_application_id: application.id }
+  )
 
-  const criteriaIds = (rawCriteria || []).map((c) => c.id)
+  if (formError) {
+    console.error("Failed to load student application form:", formError)
+    throw new Error("Gagal memuat data formulir pendaftaran.")
+  }
 
-  const { data: rawScales } = await supabase
-    .from("criteria_scales")
-    .select("id, criteria_id, label, nilai_min, nilai_max, skor")
-    .in(
-      "criteria_id",
-      criteriaIds.length > 0
-        ? criteriaIds
-        : ["00000000-0000-0000-0000-000000000000"]
-    )
-
-  const criteriaList: CriteriaWithScales[] = (rawCriteria || []).map((c) => ({
-    id: c.id,
-    period_id: c.period_id,
-    nama: c.nama,
-    tipe: c.tipe as "benefit" | "cost",
-    bobot: Number(c.bobot),
-    urutan: c.urutan,
-    sumber_nilai: c.sumber_nilai as "input" | "document",
-    criteria_scales: (rawScales || [])
-      .filter((s) => s.criteria_id === c.id)
-      .map((s) => ({
-        id: s.id,
-        criteria_id: s.criteria_id,
-        label: s.label,
-        nilai_min: Number(s.nilai_min),
-        nilai_max: Number(s.nilai_max),
-        skor: Number(s.skor),
-      }))
-      .sort((a, b) => a.nilai_min - b.nilai_min),
-  }))
-
-  // 4. Fetch existing application_values
-  const { data: rawValues } = await supabase
-    .from("application_values")
-    .select("criteria_id, nilai_mentah, skor")
-    .eq("application_id", application.id)
-
+  const criteriaById = new Map<string, CriteriaWithScales>()
   const initialValues: Record<
     string,
-    { nilai_mentah: number | null; skor: number | null }
+    { nilai_mentah: number | null; selected_scale_id: string | null }
   > = {}
 
-  if (rawValues) {
-    for (const v of rawValues) {
-      initialValues[v.criteria_id] = {
-        nilai_mentah: v.nilai_mentah !== null ? Number(v.nilai_mentah) : null,
-        skor: v.skor !== null ? Number(v.skor) : null,
+  for (const row of formRows || []) {
+    let criterion = criteriaById.get(row.criteria_id)
+    if (!criterion) {
+      criterion = {
+        id: row.criteria_id,
+        nama: row.nama,
+        urutan: row.urutan,
+        criteria_scales: [],
       }
+      criteriaById.set(row.criteria_id, criterion)
+    }
+
+    if (row.scale_id && row.scale_label) {
+      criterion.criteria_scales.push({
+        id: row.scale_id,
+        label: row.scale_label,
+      })
+    }
+
+    initialValues[row.criteria_id] = {
+      nilai_mentah:
+        row.nilai_mentah !== null ? Number(row.nilai_mentah) : null,
+      selected_scale_id: row.selected_scale_id,
     }
   }
+
+  const criteriaList = Array.from(criteriaById.values())
 
   // 5. Fetch uploaded documents
   const { data: rawDocuments } = await supabase
