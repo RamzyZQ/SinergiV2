@@ -12,11 +12,11 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="h-screen flex bg-background overflow-hidden">
       <React.Suspense fallback={<AdminSidebarFallback />}>
         <AdminSidebar />
       </React.Suspense>
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
         <React.Suspense fallback={<AdminHeaderFallback />}>
           <AdminLayoutContent>{children}</AdminLayoutContent>
         </React.Suspense>
@@ -85,18 +85,18 @@ async function AdminLayoutContent({
 
 function AdminSidebarFallback() {
   return (
-    <aside className="hidden lg:flex w-64 flex-col border-r bg-sidebar h-screen sticky top-0 shrink-0 z-30">
-      <div className="h-16 flex items-center gap-2.5 px-6 border-b">
-        <Skeleton className="size-8 rounded-lg" />
+    <aside className="hidden lg:flex w-64 flex-col border-r border-white/10 bg-[#173B70] h-full shrink-0 z-30">
+      <div className="h-20 shrink-0 flex items-center gap-2.5 px-6 border-b border-white/15">
+        <Skeleton className="size-8 rounded-lg bg-white/20" />
         <div className="space-y-1">
-          <Skeleton className="h-3 w-28" />
-          <Skeleton className="h-2 w-24" />
+          <Skeleton className="h-3 w-28 bg-white/20" />
+          <Skeleton className="h-2 w-24 bg-white/20" />
         </div>
       </div>
-      <div className="flex-1 py-6 px-6 space-y-4">
-        <Skeleton className="h-3 w-28" />
+      <div className="flex-1 py-6 px-4 space-y-3">
+        <Skeleton className="h-3 w-24 bg-white/20" />
         {Array.from({ length: 3 }, (_, index) => (
-          <Skeleton key={index} className="h-9 w-full rounded-lg" />
+          <Skeleton key={index} className="h-12 w-full rounded-2xl bg-white/20" />
         ))}
       </div>
     </aside>

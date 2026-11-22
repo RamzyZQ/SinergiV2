@@ -1,5 +1,5 @@
 import * as React from "react"
-import { notFound, redirect } from "next/navigation"
+import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { PublishView } from "./publish-view"
 

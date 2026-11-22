@@ -429,8 +429,8 @@ export function StudentResultView({
                 <Radar
                   name="Skor Anda"
                   dataKey="Skor Anda"
-                  stroke={isPassed ? "#10b981" : "#6366f1"}
-                  fill={isPassed ? "#10b981" : "#6366f1"}
+                  stroke={isPassed ? "#10b981" : "#2456A6"}
+                  fill={isPassed ? "#10b981" : "#2456A6"}
                   fillOpacity={0.4}
                 />
                 <Tooltip

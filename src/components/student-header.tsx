@@ -3,11 +3,11 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Bell, User, LogOut, Home, ChevronDown } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { User, LogOut, Home, ChevronDown } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { createClient } from "@/lib/supabase/client"
 import { SinergiLogo } from "@/components/sinergi-logo"
+import { StudentNotificationMenu } from "@/components/student-notification-menu"
 import { cn } from "@/lib/utils"
 
 interface StudentHeaderProps {
@@ -75,16 +75,7 @@ export function StudentHeader({
 
         {/* Right: Notification + User */}
         <div className="flex items-center gap-2">
-          {/* Notification Bell */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative size-9 text-muted-foreground hover:text-foreground rounded-lg"
-            aria-label="Notifikasi"
-          >
-            <Bell className="size-4" />
-            <span className="absolute top-2 right-2 size-1.5 bg-[oklch(0.72_0.17_55)] rounded-full ring-2 ring-background" />
-          </Button>
+          <StudentNotificationMenu />
 
           {/* User Profile Menu */}
           <div className="relative">

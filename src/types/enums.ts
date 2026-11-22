@@ -175,28 +175,28 @@ export type StatusColorConfig = {
 
 export const STATUS_COLORS: Record<string, StatusColorConfig> = {
   // General / shared
-  draft: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', dot: 'bg-gray-500' },
-  submitted: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300', dot: 'bg-blue-500' },
-  pending: { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300', dot: 'bg-yellow-500' },
-  verified: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', dot: 'bg-green-500' },
-  approved: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', dot: 'bg-green-500' },
-  passed: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', dot: 'bg-green-500' },
-  rejected: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', dot: 'bg-red-500' },
-  not_passed: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', dot: 'bg-red-500' },
+  draft: { bg: 'bg-[#F5F7FB]', text: 'text-[#8492A6]', border: 'border-[#DCE5F1]', dot: 'bg-[#8492A6]' },
+  submitted: { bg: 'bg-[#EAF2FF]', text: 'text-[#263449]', border: 'border-[#DCE5F1]', dot: 'bg-[#2456A6]' },
+  pending: { bg: 'bg-[#E8A23A]/10', text: 'text-[#263449]', border: 'border-[#E8A23A]', dot: 'bg-[#E8A23A]' },
+  verified: { bg: 'bg-[#2E9B68]/10', text: 'text-[#2E9B68]', border: 'border-[#2E9B68]/30', dot: 'bg-[#2E9B68]' },
+  approved: { bg: 'bg-[#2E9B68]/10', text: 'text-[#2E9B68]', border: 'border-[#2E9B68]/30', dot: 'bg-[#2E9B68]' },
+  passed: { bg: 'bg-[#2E9B68]/10', text: 'text-[#2E9B68]', border: 'border-[#2E9B68]/30', dot: 'bg-[#2E9B68]' },
+  rejected: { bg: 'bg-[#D9534F]/10', text: 'text-[#D9534F]', border: 'border-[#D9534F]/30', dot: 'bg-[#D9534F]' },
+  not_passed: { bg: 'bg-[#D9534F]/10', text: 'text-[#D9534F]', border: 'border-[#D9534F]/30', dot: 'bg-[#D9534F]' },
 
   // Period-specific
-  open: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300', dot: 'bg-blue-500' },
-  closed: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', dot: 'bg-gray-500' },
-  verification: { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300', dot: 'bg-yellow-500' },
-  calculated: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300', dot: 'bg-purple-500' },
-  published: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', dot: 'bg-green-500' },
+  open: { bg: 'bg-[#EAF2FF]', text: 'text-[#2456A6]', border: 'border-[#DCE5F1]', dot: 'bg-[#2456A6]' },
+  closed: { bg: 'bg-[#F5F7FB]', text: 'text-[#8492A6]', border: 'border-[#DCE5F1]', dot: 'bg-[#8492A6]' },
+  verification: { bg: 'bg-[#E8A23A]/10', text: 'text-[#263449]', border: 'border-[#E8A23A]', dot: 'bg-[#E8A23A]' },
+  calculated: { bg: 'bg-[#EAF2FF]', text: 'text-[#2456A6]', border: 'border-[#DCE5F1]', dot: 'bg-[#2456A6]' },
+  published: { bg: 'bg-[#2E9B68]/10', text: 'text-[#2E9B68]', border: 'border-[#2E9B68]/30', dot: 'bg-[#2E9B68]' },
 
   // Calculation type
-  simulation: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300', dot: 'bg-purple-500' },
+  simulation: { bg: 'bg-[#EAF2FF]', text: 'text-[#263449]', border: 'border-[#D9A441]', dot: 'bg-[#D9A441]' },
 
   // Notification send status
-  sent: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', dot: 'bg-green-500' },
-  failed: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', dot: 'bg-red-500' },
+  sent: { bg: 'bg-[#2E9B68]/10', text: 'text-[#2E9B68]', border: 'border-[#2E9B68]/30', dot: 'bg-[#2E9B68]' },
+  failed: { bg: 'bg-[#D9534F]/10', text: 'text-[#D9534F]', border: 'border-[#D9534F]/30', dot: 'bg-[#D9534F]' },
 } as const;
 
 /**

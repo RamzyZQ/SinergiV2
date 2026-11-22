@@ -96,8 +96,8 @@ const statusConfigs: Record<string, StatusConfig> = {
   open: {
     label: "Pendaftaran Dibuka",
     icon: DoorOpen,
-    className: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800",
-    dotClass: "bg-sky-500",
+    className: "bg-[#EAF2FF] text-[#173B70] border-[#D9A441] dark:bg-[#173B70] dark:text-[#EAF2FF] dark:border-[#2456A6]",
+    dotClass: "bg-[#D9A441]",
   },
   closed: {
     label: "Ditutup",
@@ -108,28 +108,28 @@ const statusConfigs: Record<string, StatusConfig> = {
   verification: {
     label: "Tahap Verifikasi",
     icon: Search,
-    className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800",
-    dotClass: "bg-amber-500",
+    className: "bg-[#EAF2FF] text-[#173B70] border-[#D9A441] dark:bg-[#173B70] dark:text-[#EAF2FF] dark:border-[#2456A6]",
+    dotClass: "bg-[#D9A441]",
   },
   calculated: {
     label: "Sudah Dihitung",
     icon: Calculator,
-    className: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800",
-    dotClass: "bg-purple-500",
+    className: "bg-[#EAF2FF] text-[#173B70] border-[#2456A6] dark:bg-[#173B70] dark:text-[#EAF2FF] dark:border-[#2456A6]",
+    dotClass: "bg-[#2456A6]",
   },
   published: {
     label: "Dipublikasi",
     icon: Globe,
-    className: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/60 dark:text-teal-300 dark:border-teal-800",
-    dotClass: "bg-teal-500",
+    className: "bg-[#173B70] text-white border-[#173B70] dark:bg-[#2456A6] dark:text-white dark:border-[#2456A6]",
+    dotClass: "bg-[#D9A441]",
   },
 
   // Calculation types
   simulation: {
     label: "Simulasi",
     icon: FlaskConical,
-    className: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800",
-    dotClass: "bg-purple-500",
+    className: "bg-[#EAF2FF] text-[#173B70] border-[#D9A441] dark:bg-[#173B70] dark:text-[#EAF2FF] dark:border-[#2456A6]",
+    dotClass: "bg-[#D9A441]",
   },
 }
 
@@ -162,7 +162,7 @@ export function StatusBadge({
   const displayLabel = label || config.label
 
   const sizeClasses = {
-    sm: "text-[11px] px-1.5 py-0.5 gap-1",
+    sm: "text-[11px] px-2.5 py-0.5 gap-1.5",
     md: "text-xs px-2.5 py-1 gap-1.5",
     lg: "text-sm px-3 py-1.5 gap-2",
   }
@@ -177,7 +177,7 @@ export function StatusBadge({
     <span
       data-status={normalizedKey}
       className={cn(
-        "inline-flex items-center font-medium rounded-full border shadow-2xs transition-colors",
+        "inline-flex shrink-0 items-center whitespace-nowrap font-medium rounded-full border shadow-2xs transition-colors",
         sizeClasses[size],
         config.className,
         className
@@ -192,7 +192,7 @@ export function StatusBadge({
       {showIcon && !showDot && (
         <Icon className={cn("shrink-0", iconSizes[size])} aria-hidden="true" />
       )}
-      <span>{displayLabel}</span>
+      <span className="whitespace-nowrap">{displayLabel}</span>
     </span>
   )
 }

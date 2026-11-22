@@ -1239,12 +1239,18 @@ export function ApplicationWizard({
           type="button"
           variant="outline"
           size="sm"
-          disabled={currentStep === 1}
-          onClick={() => setCurrentStep((prev) => Math.max(prev - 1, 1))}
-          className="gap-1.5"
+          onClick={async () => {
+            if (currentStep === 1) {
+              const saved = await performSave()
+              if (saved) router.push("/dashboard")
+              return
+            }
+            setCurrentStep((prev) => Math.max(prev - 1, 1))
+          }}
+          className="gap-1.5 border-[#2456A6]/35 text-[#2456A6] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#2456A6] hover:bg-[#EAF2FF] hover:text-[#173B70] hover:shadow-md active:translate-y-0 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-[#2456A6]/40"
         >
           <ArrowLeft className="size-4" />
-          Sebelumnya
+          {currentStep === 1 ? "Kembali ke Dashboard" : "Sebelumnya"}
         </Button>
 
         {currentStep < 5 ? (

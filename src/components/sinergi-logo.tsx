@@ -1,4 +1,5 @@
 import * as React from "react"
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 /**
@@ -63,26 +64,26 @@ export function SinergiLogoMark({ className, size = 32 }: SinergiLogoMarkProps) 
       {/* Amber star rays — top left */}
       <path
         d="M9 9 L10.5 7"
-        stroke="#F59E0B"
+        stroke="#D9A441"
         strokeWidth="1.5"
         strokeLinecap="round"
       />
       {/* Amber star ray — top */}
       <path
         d="M18 7 L18 5"
-        stroke="#F59E0B"
+        stroke="#D9A441"
         strokeWidth="1.5"
         strokeLinecap="round"
       />
       {/* Amber star ray — top right */}
       <path
         d="M27 9 L25.5 7"
-        stroke="#F59E0B"
+        stroke="#D9A441"
         strokeWidth="1.5"
         strokeLinecap="round"
       />
       {/* Amber star dot */}
-      <circle cx="18" cy="8" r="1" fill="#F59E0B" fillOpacity="0.7" />
+      <circle cx="18" cy="8" r="1" fill="#D9A441" fillOpacity="0.7" />
     </svg>
   )
 }
@@ -94,13 +95,15 @@ interface SinergiLogoProps {
   className?: string
   /** Custom subtitle text below SINERGI */
   subtitle?: string | false
+  /** White artwork for dark surfaces */
+  tone?: "light" | "dark"
 }
 
 const sizeMap = {
-  sm: { mark: 28, titleClass: "text-sm", subtitleClass: "text-[9px]", gap: "gap-2" },
-  md: { mark: 34, titleClass: "text-base", subtitleClass: "text-[10px]", gap: "gap-2.5" },
-  lg: { mark: 42, titleClass: "text-xl", subtitleClass: "text-xs", gap: "gap-3" },
-  xl: { mark: 52, titleClass: "text-2xl", subtitleClass: "text-sm", gap: "gap-3.5" },
+  sm: { mark: 28, titleClass: "text-sm", subtitleClass: "text-[9px]", logoWidth: 132 },
+  md: { mark: 34, titleClass: "text-base", subtitleClass: "text-[10px]", logoWidth: 158 },
+  lg: { mark: 42, titleClass: "text-xl", subtitleClass: "text-xs", logoWidth: 190 },
+  xl: { mark: 52, titleClass: "text-2xl", subtitleClass: "text-sm", logoWidth: 224 },
 }
 
 export function SinergiLogo({
@@ -108,8 +111,9 @@ export function SinergiLogo({
   size = "md",
   className,
   subtitle = "Seleksi Beasiswa",
+  tone = "light",
 }: SinergiLogoProps) {
-  const { mark, titleClass, subtitleClass, gap } = sizeMap[size]
+  const { mark, titleClass, subtitleClass, logoWidth } = sizeMap[size]
 
   if (variant === "mark-only") {
     return <SinergiLogoMark size={mark} className={className} />
@@ -131,18 +135,21 @@ export function SinergiLogo({
   }
 
   return (
-    <div className={cn("flex items-center", gap, className)}>
-      <SinergiLogoMark size={mark} />
-      <div className="flex flex-col leading-none">
-        <span className={cn("font-black tracking-tight text-primary leading-none", titleClass)}>
-          SINERGI
+    <div className={cn("flex flex-col items-start", className)}>
+      <Image
+        src={tone === "dark" ? "/images/brand/sinergi-logo-white.png" : "/images/brand/sinergi-logo-color.png"}
+        alt="SINERGI · Sistem Penerimaan Beasiswa Terintegrasi"
+        width={tone === "dark" ? 1080 : 1300}
+        height={tone === "dark" ? 360 : 420}
+        priority
+        className="h-auto object-contain"
+        style={{ width: logoWidth }}
+      />
+      {subtitle !== false && (
+        <span className={cn("mt-0.5 font-medium uppercase tracking-wider leading-none", subtitleClass, tone === "dark" ? "text-white/75" : "text-muted-foreground")}>
+          {subtitle}
         </span>
-        {subtitle !== false && (
-          <span className={cn("text-muted-foreground font-medium uppercase tracking-wider leading-none mt-0.5", subtitleClass)}>
-            {subtitle}
-          </span>
-        )}
-      </div>
+      )}
     </div>
   )
 }
