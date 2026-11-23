@@ -26,6 +26,8 @@ export const metadata = {
   description: "Pusat kendali dan monitoring seleksi beasiswa mahasiswa dengan metode ELECTRE I.",
 }
 
+const periodAccentEdges = ["border-t-[#D9A441]", "border-t-[#2456A6]", "border-t-[#8492A6]"]
+
 export default function AdminDashboardPage() {
   return (
     <React.Suspense fallback={<AdminDashboardFallback />}>
@@ -158,12 +160,12 @@ async function AdminDashboardContent() {
 
   // Donut chart dataset
   const donutData: StatusDistributionItem[] = [
-    { status: "draft", label: "Draft Mahasiswa", count: draftCount, color: "#94a3b8" },
-    { status: "submitted", label: "Menunggu Verifikasi", count: pendingVerification, color: "#f59e0b" },
-    { status: "verified", label: "Terverifikasi", count: totalVerified, color: "#0d9488" },
-    { status: "passed", label: "Lolos Seleksi", count: passedCount, color: "#10b981" },
-    { status: "not_passed", label: "Tidak Lolos", count: notPassedCount, color: "#6b7280" },
-    { status: "rejected", label: "Berkas Ditolak", count: rejectedCount, color: "#ef4444" },
+    { status: "draft", label: "Draf mahasiswa", count: draftCount, color: "#8492A6" },
+    { status: "submitted", label: "Menunggu verifikasi", count: pendingVerification, color: "#E8A23A" },
+    { status: "verified", label: "Terverifikasi", count: totalVerified, color: "#2E9B68" },
+    { status: "passed", label: "Lolos seleksi", count: passedCount, color: "#173B70" },
+    { status: "not_passed", label: "Tidak lolos", count: notPassedCount, color: "#8492A6" },
+    { status: "rejected", label: "Berkas ditolak", count: rejectedCount, color: "#D9534F" },
   ]
 
   return (
@@ -190,33 +192,33 @@ async function AdminDashboardContent() {
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Applicants */}
-        <Card className="shadow-sm">
+        <Card className="group relative overflow-hidden border-t-[3px] border-t-[#2456A6] shadow-sm transition-shadow duration-300 hover:shadow-md hover:shadow-[#173B70]/10">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            <CardTitle className="text-xs font-bold text-[#8492A6] uppercase tracking-wider">
               Total Pelamar
             </CardTitle>
-            <div className="size-8 rounded-lg bg-muted flex items-center justify-center">
-              <Users className="size-4 text-muted-foreground" />
+            <div className="size-10 rounded-xl bg-[#EAF2FF] flex items-center justify-center">
+              <Users className="size-[18px] text-[#2456A6]" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black">{totalApplicants ?? 0}</div>
+            <div className="text-3xl font-black text-[#263449]">{totalApplicants ?? 0}</div>
             <p className="text-xs text-muted-foreground mt-1">Dari seluruh periode beasiswa</p>
           </CardContent>
         </Card>
 
         {/* Needs Verification */}
-        <Card className="shadow-sm border-amber-200/60 bg-amber-50/30">
+        <Card className="group relative overflow-hidden border-t-[3px] border-t-[#D9A441] border-amber-200/60 bg-[#FFF5D9]/70 shadow-sm transition-shadow duration-300 hover:shadow-md hover:shadow-[#D9A441]/15">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-bold text-amber-700 uppercase tracking-wider">
               Perlu Verifikasi
             </CardTitle>
-            <div className="size-8 rounded-lg bg-amber-100 flex items-center justify-center">
-              <AlertTriangle className="size-4 text-amber-600" />
+            <div className="size-10 rounded-xl bg-[#D9A441]/15 flex items-center justify-center">
+              <AlertTriangle className="size-[18px] text-[#A66B08]" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-amber-700">
+            <div className="text-3xl font-black text-[#A66B08]">
               {pendingVerification}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Berkas diajukan menunggu peninjauan</p>
@@ -224,33 +226,33 @@ async function AdminDashboardContent() {
         </Card>
 
         {/* Total Quota */}
-        <Card className="shadow-sm">
+        <Card className="group relative overflow-hidden border-t-[3px] border-t-[#D9A441] shadow-sm transition-shadow duration-300 hover:shadow-md hover:shadow-[#173B70]/10">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            <CardTitle className="text-xs font-bold text-[#8492A6] uppercase tracking-wider">
               Total Kuota
             </CardTitle>
-            <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Award className="size-4 text-primary" />
+            <div className="size-10 rounded-xl bg-[#FFF5D9] flex items-center justify-center">
+              <Award className="size-[18px] text-[#A66B08]" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-primary">{totalQuota}</div>
+            <div className="text-3xl font-black text-[#173B70]">{totalQuota}</div>
             <p className="text-xs text-muted-foreground mt-1">Akumulasi kuota beasiswa tersedia</p>
           </CardContent>
         </Card>
 
         {/* Cutoff Score */}
-        <Card className="shadow-sm">
+        <Card className="group relative overflow-hidden border-t-[3px] border-t-[#2E9B68] shadow-sm transition-shadow duration-300 hover:shadow-md hover:shadow-[#173B70]/10">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            <CardTitle className="text-xs font-bold text-[#8492A6] uppercase tracking-wider">
               Garis Batas Lolos
             </CardTitle>
-            <div className="size-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-              <TrendingUp className="size-4 text-emerald-600" />
+            <div className="size-10 rounded-xl bg-[#EAF2FF] flex items-center justify-center">
+              <TrendingUp className="size-4 text-[#2E9B68]" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-emerald-600">
+            <div className="text-3xl font-black text-[#2E9B68]">
               {cutoffScore !== null ? (cutoffScore > 0 ? `+${cutoffScore}` : cutoffScore) : "—"}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -266,7 +268,7 @@ async function AdminDashboardContent() {
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <Sparkles className="size-4 text-[oklch(0.72_0.17_55)]" />
+              <Sparkles className="size-4 text-[#D9A441]" />
               Perlu Ditindak
             </h2>
             <span className="text-xs text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded-full">
@@ -279,10 +281,10 @@ async function AdminDashboardContent() {
               {actionItems.map((item) => (
                 <div
                   key={item.id}
-                  className="p-4 rounded-xl border bg-card text-card-foreground shadow-sm hover:border-primary/40 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                  className="p-4 rounded-2xl border border-[#DCE5F1] bg-white text-card-foreground shadow-sm hover:border-[#D9A441]/60 hover:shadow-md transition-all duration-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-muted shrink-0 mt-0.5">
+                    <div className="p-2.5 rounded-xl bg-[#EAF2FF] ring-1 ring-[#DCE5F1] shrink-0 mt-0.5">
                       {item.icon}
                     </div>
                     <div className="space-y-1">
@@ -316,9 +318,11 @@ async function AdminDashboardContent() {
               ))}
             </div>
           ) : (
-            <Card className="border-dashed bg-muted/20">
-              <CardContent className="py-10 text-center space-y-2">
-                <CheckCircle2 className="size-9 text-emerald-500 mx-auto" />
+            <Card className="overflow-hidden border-[#DCE5F1] bg-gradient-to-br from-[#EAF2FF] via-white to-[#FFF5D9]/70 shadow-sm">
+              <CardContent className="py-10 text-center space-y-3">
+                <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-[#DCE5F1]">
+                  <CheckCircle2 className="size-8 text-[#2E9B68]" />
+                </div>
                 <p className="text-sm font-semibold">Semua tugas administrasi up-to-date!</p>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                   Tidak ada berkas yang menunggu verifikasi mendesak ataupun kalkulasi yang tertunda saat ini.
@@ -330,7 +334,7 @@ async function AdminDashboardContent() {
 
         {/* Right: Status Distribution Donut Chart */}
         <div className="lg:col-span-5">
-          <Card className="shadow-sm h-full flex flex-col justify-between">
+          <Card className="h-full overflow-hidden border-t-[3px] border-t-[#2456A6] shadow-sm transition-shadow duration-300 hover:shadow-lg hover:shadow-[#173B70]/10 flex flex-col justify-between">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-bold">
                 Distribusi Status Pelamar
@@ -352,7 +356,10 @@ async function AdminDashboardContent() {
       {/* Recent Periods List */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold tracking-tight">
+          <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-[#FFF5D9] text-[#A66B08]">
+              <Calendar className="size-4" />
+            </span>
             Periode Beasiswa Terbaru
           </h2>
           <Link
@@ -366,10 +373,10 @@ async function AdminDashboardContent() {
 
         {periods && periods.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {periods.slice(0, 6).map((period) => (
+            {periods.slice(0, 6).map((period, index) => (
               <Card
                 key={period.id}
-                className="hover:border-primary/40 transition-all shadow-sm flex flex-col justify-between hover:shadow-md"
+                className={`group overflow-hidden border-t-[3px] ${periodAccentEdges[index % periodAccentEdges.length]} transition-shadow duration-300 shadow-sm flex flex-col justify-between hover:shadow-md hover:shadow-[#173B70]/10`}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">
@@ -384,10 +391,10 @@ async function AdminDashboardContent() {
                 </CardHeader>
 
                 <CardContent className="pt-0">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-[#DCE5F1]">
                     <span className="font-semibold font-mono">Kuota: {period.kuota} Mhs</span>
                     <Link href={`/admin/periods/${period.id}/overview`}>
-                      <Button variant="ghost" size="sm" className="gap-1 font-semibold text-xs h-7">
+                      <Button variant="ghost" size="sm" className="gap-1 font-semibold text-xs h-8 text-[#2456A6] hover:bg-[#EAF2FF] hover:text-[#173B70]">
                         Buka
                         <ArrowRight className="size-3" />
                       </Button>

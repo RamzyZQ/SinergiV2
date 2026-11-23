@@ -130,6 +130,18 @@ export function CreatePeriodDialog() {
             </div>
 
             <div className="space-y-1.5">
+              <Label htmlFor="period-pengumuman">Tanggal dan Jam Pengumuman Resmi (WIB)</Label>
+              <Input
+                id="period-pengumuman"
+                name="tgl_pengumuman"
+                type="datetime-local"
+              />
+              <span className="text-[11px] text-muted-foreground">
+                Opsional. Isi jadwal resmi agar countdown mahasiswa akurat.
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
               <Label htmlFor="period-kuota">Kuota Penerima (Top N)</Label>
               <Input
                 id="period-kuota"

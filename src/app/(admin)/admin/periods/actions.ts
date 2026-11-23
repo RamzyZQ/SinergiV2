@@ -6,6 +6,7 @@ import ExcelJS from "exceljs"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { parseJakartaDateTime } from "@/lib/datetime"
 import { resend, buildPublicationEmailHtml } from "@/lib/email/resend"
 import { parseApplicantImportRows } from "@/lib/import/applicant-import"
 import {
@@ -56,6 +57,11 @@ export async function createPeriodAction(
     const deskripsi = (formData.get("deskripsi") as string)?.trim() || null
     const tgl_buka = formData.get("tgl_buka") as string
     const tgl_tutup = formData.get("tgl_tutup") as string
+    const tgl_pengumuman_input = (formData.get("tgl_pengumuman") as string) || ""
+    const announcementDate = tgl_pengumuman_input
+      ? parseJakartaDateTime(tgl_pengumuman_input)
+      : null
+    const closingDate = parseJakartaDateTime(tgl_tutup)
     const kuota = parseInt(formData.get("kuota") as string, 10)
 
     if (!nama) return { success: false, error: "Nama periode wajib diisi." }
@@ -70,6 +76,12 @@ export async function createPeriodAction(
         error: "Tanggal tutup pendaftaran harus setelah tanggal buka.",
       }
     }
+    if (tgl_pengumuman_input && !announcementDate) {
+      return { success: false, error: "Tanggal pengumuman tidak valid." }
+    }
+    if (announcementDate && closingDate && announcementDate <= closingDate) {
+      return { success: false, error: "Tanggal pengumuman harus setelah tanggal tutup pendaftaran." }
+    }
 
     const { data: newPeriod, error: insertErr } = await supabase
       .from("scholarship_periods")
@@ -78,6 +90,7 @@ export async function createPeriodAction(
         deskripsi,
         tgl_buka: new Date(tgl_buka).toISOString(),
         tgl_tutup: new Date(tgl_tutup).toISOString(),
+        ...(announcementDate ? { tgl_pengumuman: announcementDate.toISOString() } : {}),
         kuota,
         status: "draft",
         threshold_c_mode: "average",
@@ -90,7 +103,9 @@ export async function createPeriodAction(
     if (insertErr || !newPeriod) {
       return {
         success: false,
-        error: "Gagal membuat periode: " + (insertErr?.message || "Kesalahan database"),
+        error: insertErr?.message.includes("tgl_pengumuman")
+          ? "Supabase belum memiliki kolom jadwal pengumuman. Terapkan migrasi 00015_announcement_date.sql terlebih dahulu."
+          : "Gagal membuat periode: " + (insertErr?.message || "Kesalahan database"),
       }
     }
 
@@ -122,6 +137,11 @@ export async function updatePeriodSettingsAction(
     const deskripsi = (formData.get("deskripsi") as string)?.trim() || null
     const tgl_buka = formData.get("tgl_buka") as string
     const tgl_tutup = formData.get("tgl_tutup") as string
+    const tgl_pengumuman_input = (formData.get("tgl_pengumuman") as string) || ""
+    const announcementDate = tgl_pengumuman_input
+      ? parseJakartaDateTime(tgl_pengumuman_input)
+      : null
+    const closingDate = parseJakartaDateTime(tgl_tutup)
     const kuota = parseInt(formData.get("kuota") as string, 10)
 
     const threshold_c_mode = (formData.get("threshold_c_mode") as string) || "average"
@@ -145,26 +165,41 @@ export async function updatePeriodSettingsAction(
     if (!nama) return { success: false, error: "Nama periode wajib diisi." }
     if (isNaN(kuota) || kuota <= 0)
       return { success: false, error: "Kuota harus lebih besar dari 0." }
+    if (tgl_pengumuman_input && !announcementDate) {
+      return { success: false, error: "Tanggal pengumuman tidak valid." }
+    }
+    if (announcementDate && closingDate && announcementDate <= closingDate) {
+      return { success: false, error: "Tanggal pengumuman harus setelah tanggal tutup pendaftaran." }
+    }
+
+    const periodUpdate = {
+      nama,
+      deskripsi,
+      tgl_buka: new Date(tgl_buka).toISOString(),
+      tgl_tutup: new Date(tgl_tutup).toISOString(),
+      kuota,
+      threshold_c_mode: threshold_c_mode as "average" | "manual",
+      threshold_c,
+      threshold_d_mode: threshold_d_mode as "average" | "manual",
+      threshold_d,
+      tie_break_rules,
+      updated_at: new Date().toISOString(),
+      ...(announcementDate ? { tgl_pengumuman: announcementDate.toISOString() } : {}),
+      ...(formData.get("hapus_tgl_pengumuman") === "true" ? { tgl_pengumuman: null } : {}),
+    }
 
     const { error: updateErr } = await supabase
       .from("scholarship_periods")
-      .update({
-        nama,
-        deskripsi,
-        tgl_buka: new Date(tgl_buka).toISOString(),
-        tgl_tutup: new Date(tgl_tutup).toISOString(),
-        kuota,
-        threshold_c_mode: threshold_c_mode as "average" | "manual",
-        threshold_c,
-        threshold_d_mode: threshold_d_mode as "average" | "manual",
-        threshold_d,
-        tie_break_rules,
-        updated_at: new Date().toISOString(),
-      })
+      .update(periodUpdate)
       .eq("id", periodId)
 
     if (updateErr) {
-      return { success: false, error: "Gagal memperbarui pengaturan periode: " + updateErr.message }
+      return {
+        success: false,
+        error: updateErr.message.includes("tgl_pengumuman")
+          ? "Supabase belum memiliki kolom jadwal pengumuman. Terapkan migrasi 00015_announcement_date.sql terlebih dahulu."
+          : "Gagal memperbarui pengaturan periode: " + updateErr.message,
+      }
     }
 
     revalidatePath(`/admin/periods/${periodId}/overview`)

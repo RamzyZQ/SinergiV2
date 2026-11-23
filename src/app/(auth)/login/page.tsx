@@ -32,7 +32,7 @@ function LoginFormContent() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="space-y-1">
         <h1 className="text-2xl font-black tracking-tight text-foreground">Selamat Datang</h1>
@@ -64,7 +64,7 @@ function LoginFormContent() {
       )}
 
       {/* Form */}
-      <form action={formAction} className="space-y-4">
+      <form action={formAction} className="space-y-3">
         <div className="space-y-1.5">
           <Label htmlFor="email" className="text-sm font-semibold">
             Email
@@ -122,14 +122,14 @@ function LoginFormContent() {
             <button
               type="button"
               onClick={() => fillQuickAccount("admin@sinergi.ac.id", "admin123456")}
-              className="text-[11px] px-2.5 py-1 rounded-md border border-border bg-background hover:bg-secondary text-foreground font-medium transition-colors"
+              className="auth-quick-account text-[11px] px-2.5 py-1 rounded-md border border-border bg-background text-foreground font-medium transition-colors"
             >
               🛡️ Panitia/Admin
             </button>
             <button
               type="button"
               onClick={() => fillQuickAccount("mahasiswa@campus.ac.id", "mahasiswa123")}
-              className="text-[11px] px-2.5 py-1 rounded-md border border-border bg-background hover:bg-secondary text-foreground font-medium transition-colors"
+              className="auth-quick-account text-[11px] px-2.5 py-1 rounded-md border border-border bg-background text-foreground font-medium transition-colors"
             >
               🎓 Mahasiswa Demo
             </button>

@@ -1,5 +1,8 @@
 import * as React from "react"
+import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
+import { AlertCircle, ArrowLeft } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/server"
 import { StudentResultView } from "./student-result-view"
 
@@ -139,8 +142,8 @@ export default async function StudentResultPage({ params }: StudentResultPagePro
   )
 
   if (formError) {
-    console.error("Failed to load student result criteria:", formError)
-    throw new Error("Gagal memuat rincian hasil seleksi.")
+    console.warn("Failed to load student result criteria:", formError.message)
+    return <ResultLoadError />
   }
 
   const criteriaById = new Map<string, { id: string; nama: string; urutan: number }>()
@@ -163,8 +166,8 @@ export default async function StudentResultPage({ params }: StudentResultPagePro
     .eq("application_id", application.id)
 
   if (appValuesError) {
-    console.error("Failed to load student result values:", appValuesError)
-    throw new Error("Gagal memuat nilai hasil seleksi.")
+    console.warn("Failed to load student result values:", appValuesError.message)
+    return <ResultLoadError />
   }
 
   const valueMap = new Map((appValues || []).map((v) => [v.criteria_id, v]))
@@ -207,5 +210,32 @@ export default async function StudentResultPage({ params }: StudentResultPagePro
       }}
       result={resultData}
     />
+  )
+}
+
+function ResultLoadError() {
+  return (
+    <div className="mx-auto max-w-4xl">
+      <Card className="border-[#D9534F]/25 bg-white shadow-sm">
+        <CardHeader>
+          <div className="flex items-center gap-2 text-[#D9534F]">
+            <AlertCircle className="size-5" aria-hidden="true" />
+            <CardTitle>Rincian hasil belum bisa dimuat</CardTitle>
+          </div>
+          <CardDescription>
+            Data hasil seleksi belum berhasil diambil. Silakan coba lagi beberapa saat lagi.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 rounded-lg border border-[#DCE5F1] px-3.5 py-2 text-sm font-semibold text-[#173B70] transition-colors hover:bg-[#EAF2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2456A6]/40"
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Kembali ke Dashboard
+          </Link>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

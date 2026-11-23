@@ -8,7 +8,6 @@ import {
   Pie,
   Cell,
   Tooltip,
-  Legend,
 } from "recharts"
 
 export interface StatusDistributionItem {
@@ -106,35 +105,33 @@ export function DashboardDonutChart({ data, activePeriodId }: DashboardDonutChar
                 return null
               }}
             />
-            <Legend
-              verticalAlign="bottom"
-              height={36}
-              formatter={(value) => (
-                <span className="text-xs font-medium text-foreground/80 hover:text-foreground cursor-pointer">
-                  {value}
-                </span>
-              )}
-            />
           </PieChart>
         </ResponsiveContainer>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 pt-4 border-t">
+      <div className="mb-3 flex items-center justify-between rounded-lg border border-[#DCE5F1] bg-[#EAF2FF]/70 px-3 py-2 text-sm">
+        <span className="font-medium text-[#8492A6]">Total seluruh pengajuan</span>
+        <span className="font-bold tabular-nums text-[#263449]">{total}</span>
+      </div>
+      <p className="mb-2 text-xs text-[#8492A6]">Pilih status untuk melihat daftar pelamarnya.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 pt-4 border-t border-[#DCE5F1]">
         {data.map((item) => (
           <button
             key={item.status}
             type="button"
             onClick={() => handleSliceClick(item)}
-            className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 text-left transition-colors text-xs border border-transparent hover:border-border"
+            className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-[#DCE5F1] bg-white px-3 py-2.5 text-left text-xs transition-colors hover:bg-[#EAF2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2456A6]/40"
           >
-            <div className="flex items-center gap-2 truncate">
+            <div className="flex min-w-0 items-center gap-2">
               <span
-                className="size-2 rounded-full shrink-0"
+                className="size-2.5 rounded-full shrink-0"
                 style={{ backgroundColor: item.color }}
               />
-              <span className="truncate text-muted-foreground">{item.label}</span>
+              <span className="text-[#263449]">{item.label}</span>
             </div>
-            <span className="font-bold font-mono ml-2 shrink-0">{item.count}</span>
+            <span className="shrink-0 rounded-md bg-[#F5F7FB] px-2 py-1 font-bold tabular-nums text-[#263449]">
+              {item.count} <span className="font-medium text-[#8492A6]">({((item.count / total) * 100).toFixed(0)}%)</span>
+            </span>
           </button>
         ))}
       </div>

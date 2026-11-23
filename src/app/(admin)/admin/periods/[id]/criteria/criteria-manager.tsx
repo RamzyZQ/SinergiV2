@@ -18,7 +18,6 @@ import {
   RotateCcw,
   CloudUpload,
   Layers,
-  Check,
   Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -651,7 +650,7 @@ export function CriteriaManager({
   }
 
   // Delete scale handler
-  const handleDeleteScale = async (scaleId: string, criterionId: string) => {
+  const handleDeleteScale = async (scaleId: string) => {
     if (isLocked) return
 
     // If it's a local-only draft (new scale that hasn't been saved to DB)
@@ -707,17 +706,17 @@ export function CriteriaManager({
       {localDraftCount > 0 ? (
         <div
           role="status"
-          className="flex flex-col gap-3 rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 via-sky-50/70 to-indigo-50/50 p-4 text-sm text-sky-950 sm:flex-row sm:items-center sm:justify-between shadow-xs"
+          className="flex flex-col gap-3 rounded-xl border border-[#D9A441] bg-gradient-to-r from-[#EAF2FF] via-white to-[#EAF2FF] p-4 text-sm text-[#173B70] sm:flex-row sm:items-center sm:justify-between shadow-xs"
         >
           <div className="flex items-start sm:items-center gap-3">
-            <div className="rounded-full bg-sky-200/70 p-2 text-sky-800 shrink-0">
+            <div className="rounded-full bg-[#D9A441]/30 p-2 text-[#173B70] shrink-0">
               <Zap className="size-4" />
             </div>
             <div>
-              <p className="font-semibold text-sky-900">
+              <p className="font-semibold text-[#173B70]">
                 Mode Draf Cepat Aktif ({localDraftCount} perubahan lokal)
               </p>
-              <p className="text-xs text-sky-700/90">
+              <p className="text-xs text-[#173B70]/80">
                 Semua perubahan (bobot, nama, tipe, dan skala) disimpan di perangkat Anda terlebih dahulu tanpa latensi server.
                 {isLocked && " Periode sudah terkunci sehingga draf ini tidak dapat disimpan."}
               </p>
@@ -1169,7 +1168,7 @@ export function CriteriaManager({
                                             variant="ghost"
                                             size="icon"
                                             className="size-8 text-muted-foreground hover:text-rose-600"
-                                            onClick={() => handleDeleteScale(scale.id, criterion.id)}
+                                            onClick={() => handleDeleteScale(scale.id)}
                                             aria-label={`Hapus skala ${scale.label}`}
                                             title="Hapus Skala"
                                           >

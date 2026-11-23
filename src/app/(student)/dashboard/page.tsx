@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { StatusBadge } from "@/components/status-badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { StudentScholarshipHero } from "@/components/student-scholarship-hero"
 import {
   Calendar,
   CheckCircle,
@@ -27,15 +28,24 @@ export default async function StudentDashboardPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Get active period
-  const { data: activePeriods } = await supabase
-    .from("scholarship_periods")
-    .select("*")
-    .in("status", ["open", "verification", "calculated", "published"])
-    .order("created_at", { ascending: false })
-    .limit(1)
+  // Show currently open scholarships in the rotating hero and retain the
+  // latest active period for the student's application status panel.
+  const [{ data: activePeriods }, { data: openScholarshipRows }] = await Promise.all([
+    supabase
+      .from("scholarship_periods")
+      .select("*")
+      .in("status", ["open", "verification", "calculated", "published"])
+      .order("created_at", { ascending: false })
+      .limit(1),
+    supabase
+      .from("scholarship_periods")
+      .select("id, nama, deskripsi, tgl_tutup, kuota")
+      .eq("status", "open")
+      .order("tgl_tutup", { ascending: true }),
+  ])
 
   const activePeriod = activePeriods?.[0] || null
+  const openScholarships = openScholarshipRows || []
 
   // Get user's application for active period (if any) — parallel with past applications
   const [appResult, pastResult] = await Promise.all([
@@ -79,14 +89,14 @@ export default async function StudentDashboardPage() {
       label: "Kirim Berkas",
       sublabel: "Submit pendaftaran",
       icon: Clock,
-      color: "text-amber-500",
+      color: "text-[#D9A441]",
     },
     {
       key: "verified",
       label: "Verifikasi",
       sublabel: "Peninjauan admin",
       icon: UserCheck,
-      color: "text-indigo-500",
+      color: "text-[#2456A6]",
     },
     {
       key: "result",
@@ -118,14 +128,8 @@ export default async function StudentDashboardPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-300">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-          Portal Beasiswa
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Pantau status pendaftaran dan pengumuman beasiswa berbasis perhitungan ELECTRE
-        </p>
+      <div className="relative left-1/2 -mt-6 w-screen -translate-x-1/2 sm:-mt-8">
+        <StudentScholarshipHero scholarships={openScholarships} />
       </div>
 
       {/* Active Period Card */}
@@ -295,48 +299,62 @@ export default async function StudentDashboardPage() {
         </Card>
       )}
 
-      {/* Past Applications Section */}
+      {/* Registration history */}
       <div className="space-y-4">
-        <h2 className="text-lg font-bold tracking-tight">Riwayat Pendaftaran</h2>
-        {pastApplications.length > 0 ? (
-          <div className="divide-y rounded-xl border bg-card overflow-hidden shadow-sm">
-            {pastApplications.map((app) => (
-              <div
-                key={app.id}
-                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors"
-              >
-                <div className="space-y-1">
-                  <p className="font-semibold text-sm">
-                    {app.scholarship_periods?.nama || "Periode Beasiswa"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Diajukan pada{" "}
-                    {new Date(app.created_at).toLocaleDateString("id-ID", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <StatusBadge status={app.status} size="sm" />
-                  {app.scholarship_periods?.status === "published" && (
-                    <Link href={`/result/${app.id}`}>
-                      <Button variant="ghost" size="sm" className="gap-1 text-xs h-7">
-                        Lihat Hasil
-                        <ChevronRight className="size-3" />
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-              </div>
-            ))}
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-bold tracking-tight">Riwayat Pendaftaran</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Status pengajuan beasiswa yang pernah Anda ikuti
+            </p>
           </div>
+          {pastApplications.length > 0 && (
+            <span className="rounded-full border border-[#DCE5F1] bg-[#EAF2FF] px-3 py-1 text-xs font-semibold text-[#173B70]">
+              {pastApplications.length} pengajuan
+            </span>
+          )}
+        </div>
+        {pastApplications.length > 0 ? (
+          <Card className="overflow-hidden rounded-2xl border-[#DCE5F1] bg-white">
+            <div className="divide-y divide-[#DCE5F1]">
+              {pastApplications.map((app) => (
+                <Link
+                  key={app.id}
+                  href={`/applications/${app.id}`}
+                  className="flex cursor-pointer flex-col gap-3 px-5 py-5 transition-colors duration-200 hover:bg-[#EAF2FF]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2456A6] sm:flex-row sm:items-center sm:justify-between sm:px-6"
+                >
+                  <div className="space-y-1">
+                    <p className="text-base font-semibold text-[#263449]">
+                      {app.scholarship_periods?.nama || "Periode Beasiswa"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Diajukan pada{" "}
+                      {new Date(app.created_at).toLocaleDateString("id-ID", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <StatusBadge status={app.status} size="sm" />
+                    <ChevronRight className="size-4 text-[#8492A6]" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </Card>
         ) : (
-          <Card className="border-dashed">
-            <CardContent className="py-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                Belum ada riwayat pendaftaran sebelumnya.
+          <Card className="border-dashed border-[#DCE5F1] bg-white">
+            <CardContent className="py-9 text-center">
+              <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-xl bg-[#EAF2FF] text-[#2456A6]">
+                <FileText className="size-5" />
+              </div>
+              <p className="text-sm font-semibold text-[#263449]">
+                Belum ada riwayat pendaftaran
+              </p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+                Pengajuan beasiswa Anda akan muncul di sini beserta status dan tanggal pengajuannya.
               </p>
             </CardContent>
           </Card>

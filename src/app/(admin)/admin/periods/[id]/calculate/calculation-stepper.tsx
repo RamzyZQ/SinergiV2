@@ -254,13 +254,13 @@ export function CalculationStepper({
     <div className="space-y-6 animate-in fade-in-50 duration-300">
       {/* Simulation Banner */}
       {isSimulation && (
-        <div className="p-4 rounded-xl border border-purple-300 bg-purple-50 dark:bg-purple-950/40 dark:border-purple-800 flex items-start gap-3">
-          <FlaskConical className="size-5 text-purple-600 mt-0.5 shrink-0" />
+        <div className="p-4 rounded-xl border border-[#D9A441] bg-[#EAF2FF] dark:bg-[#173B70]/40 dark:border-[#2456A6] flex items-start gap-3">
+          <FlaskConical className="size-5 text-[#2456A6] mt-0.5 shrink-0" />
           <div className="space-y-0.5">
-            <h4 className="text-sm font-bold text-purple-900 dark:text-purple-200">
+            <h4 className="text-sm font-bold text-[#173B70] dark:text-[#EAF2FF]">
               Mode Simulasi Aktif
             </h4>
-            <p className="text-xs text-purple-700 dark:text-purple-300">
+            <p className="text-xs text-[#173B70]/80 dark:text-[#EAF2FF]/80">
               Data yang tampil saat ini adalah hasil simulasi pengujian dan <strong>TIDAK MENGUBAH</strong> hasil resmi maupun status kelulusan mahasiswa.
             </p>
           </div>
@@ -299,7 +299,7 @@ export function CalculationStepper({
                 size="sm"
                 disabled={running || verifiedApplicantsCount === 0}
                 onClick={() => handleRunCalculation("simulation")}
-                className="gap-2 border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-300"
+                className="gap-2 border-[#D9A441] text-[#173B70] hover:bg-[#EAF2FF] dark:border-[#2456A6] dark:text-[#EAF2FF]"
               >
                 {running ? (
                   <Loader2 className="size-3.5 animate-spin" />

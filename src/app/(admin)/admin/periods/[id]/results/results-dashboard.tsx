@@ -194,7 +194,7 @@ export function ResultsDashboard({
                   Official Run
                 </Badge>
               ) : (
-                <Badge className="bg-purple-600 hover:bg-purple-600 text-white text-[11px]">
+                <Badge className="bg-[#2456A6] hover:bg-[#2456A6] text-white text-[11px]">
                   Mode Simulasi
                 </Badge>
               )}

@@ -1,7 +1,10 @@
 import * as React from "react"
+import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { ApplicationWizard, CriteriaWithScales } from "./application-wizard"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCircle, ArrowLeft } from "lucide-react"
 
 interface ApplyPageProps {
   params: Promise<{
@@ -81,8 +84,36 @@ export default async function ApplyPage({ params }: ApplyPageProps) {
   )
 
   if (formError) {
-    console.error("Failed to load student application form:", formError)
-    throw new Error("Gagal memuat data formulir pendaftaran.")
+    console.warn("Failed to load student application form:", {
+      code: formError.code,
+      message: formError.message,
+      details: formError.details,
+      hint: formError.hint,
+    })
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Card className="border-[#D9534F]/25 bg-white shadow-sm">
+          <CardHeader>
+            <div className="flex items-center gap-2 text-[#D9534F]">
+              <AlertCircle className="size-5" />
+              <CardTitle>Formulir belum bisa dimuat</CardTitle>
+            </div>
+            <CardDescription>
+              Data formulir belum berhasil diambil. Silakan kembali ke dashboard dan coba buka pengajuan ini lagi.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-2 rounded-lg border border-[#DCE5F1] px-3.5 py-2 text-sm font-semibold text-[#173B70] transition-colors hover:bg-[#EAF2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2456A6]/40"
+            >
+              <ArrowLeft className="size-4" />
+              Kembali ke Dashboard
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   const criteriaById = new Map<string, CriteriaWithScales>()

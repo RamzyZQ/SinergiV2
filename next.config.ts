@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "6mb",
     },
+    serverComponentsHmrCache: false,
     optimizePackageImports: [
       "lucide-react",
       "recharts",

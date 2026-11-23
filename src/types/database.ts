@@ -70,6 +70,7 @@ export type Database = {
           deskripsi: string | null;
           tgl_buka: string;
           tgl_tutup: string;
+          tgl_pengumuman: string | null;
           kuota: number;
           status: Database['public']['Enums']['period_status'];
           threshold_c_mode: Database['public']['Enums']['threshold_mode'];
@@ -87,6 +88,7 @@ export type Database = {
           deskripsi?: string | null;
           tgl_buka: string;
           tgl_tutup: string;
+          tgl_pengumuman?: string | null;
           kuota: number;
           status?: Database['public']['Enums']['period_status'];
           threshold_c_mode?: Database['public']['Enums']['threshold_mode'];
@@ -104,6 +106,7 @@ export type Database = {
           deskripsi?: string | null;
           tgl_buka?: string;
           tgl_tutup?: string;
+          tgl_pengumuman?: string | null;
           kuota?: number;
           status?: Database['public']['Enums']['period_status'];
           threshold_c_mode?: Database['public']['Enums']['threshold_mode'];

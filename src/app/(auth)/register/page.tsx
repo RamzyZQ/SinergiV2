@@ -7,7 +7,7 @@ import { registerAction } from "./actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, UserPlus } from "lucide-react"
+import { AlertCircle, Eye, EyeOff, Loader2, UserPlus } from "lucide-react"
 
 export default function RegisterPage() {
   const [state, formAction, isPending] = useActionState(registerAction, null)
@@ -15,19 +15,13 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="space-y-1">
         <h1 className="text-2xl font-black tracking-tight text-foreground">Buat Akun Baru</h1>
         <p className="text-sm text-muted-foreground">
           Daftar sebagai mahasiswa untuk mengajukan beasiswa
         </p>
-      </div>
-
-      {/* Info banner */}
-      <div className="flex items-start gap-2.5 p-3.5 text-xs rounded-xl bg-sky-50 text-sky-800 border border-sky-200">
-        <CheckCircle2 className="size-4 shrink-0 text-sky-600 mt-0.5" />
-        <span>Akun langsung aktif setelah pendaftaran — tidak perlu menunggu email verifikasi.</span>
       </div>
 
       {/* Error */}
@@ -42,7 +36,7 @@ export default function RegisterPage() {
       )}
 
       {/* Form */}
-      <form action={formAction} className="space-y-4">
+      <form action={formAction} className="space-y-3">
         <div className="space-y-1.5">
           <Label htmlFor="nama" className="text-sm font-semibold">
             Nama Lengkap

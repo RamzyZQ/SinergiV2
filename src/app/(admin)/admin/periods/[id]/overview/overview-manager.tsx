@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatusBadge } from "@/components/status-badge"
+import { formatDateTimeLocalJakarta } from "@/lib/datetime"
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,7 @@ interface OverviewManagerProps {
     deskripsi: string | null
     tgl_buka: string
     tgl_tutup: string
+    tgl_pengumuman: string | null
     kuota: number
     status: "draft" | "open" | "closed" | "verification" | "calculated" | "published"
     threshold_c_mode: "average" | "manual"
@@ -386,6 +388,25 @@ export function OverviewManager({ period, stats }: OverviewManagerProps) {
                       : ""
                   }
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="tgl_pengumuman">Tanggal dan Jam Pengumuman Resmi (WIB)</Label>
+                <Input
+                  id="tgl_pengumuman"
+                  name="tgl_pengumuman"
+                  type="datetime-local"
+                  defaultValue={formatDateTimeLocalJakarta(period.tgl_pengumuman)}
+                />
+                <span className="text-[11px] text-muted-foreground">
+                  Countdown mahasiswa mengikuti jadwal ini. Kosongkan untuk belum menetapkan tanggal.
+                </span>
+                {period.tgl_pengumuman && (
+                  <label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+                    <input type="checkbox" name="hapus_tgl_pengumuman" value="true" />
+                    Hapus jadwal pengumuman tersimpan
+                  </label>
+                )}
               </div>
 
               <div className="space-y-1.5">

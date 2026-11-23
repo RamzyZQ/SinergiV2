@@ -14,6 +14,29 @@ function normalizeHeader(value: string) {
     .trim()
 }
 
+function findCriterionHeaderIndex(headers: string[], criterionName: string) {
+  const normalizedName = normalizeHeader(criterionName)
+  const exactMatch = headers.indexOf(normalizedName)
+  if (exactMatch >= 0) return exactMatch
+
+  const aliases: Record<string, string[]> = {
+    ip: ["ipk", "indeks prestasi", "indeks prestasi kumulatif"],
+    ipk: ["ip", "indeks prestasi", "indeks prestasi kumulatif"],
+  }
+  for (const alias of aliases[normalizedName] || []) {
+    const aliasMatch = headers.indexOf(normalizeHeader(alias))
+    if (aliasMatch >= 0) return aliasMatch
+  }
+
+  const nameWords = normalizedName.split(" ")
+  return headers.findIndex((header) => {
+    const headerWords = header.split(" ")
+    return headerWords.some((_, start) =>
+      nameWords.every((word, offset) => headerWords[start + offset] === word)
+    )
+  })
+}
+
 function parseNumericValue(value: unknown) {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : null
@@ -73,7 +96,7 @@ export function parseApplicantImportRows(
   }
 
   const criterionIndexes = criteriaNames.map((name) => {
-    const index = headers.indexOf(normalizeHeader(name))
+    const index = findCriterionHeaderIndex(headers, name)
     if (index < 0) {
       throw new Error(`Kolom untuk kriteria "${name}" tidak ditemukan.`)
     }
